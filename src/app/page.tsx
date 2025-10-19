@@ -416,7 +416,7 @@ export default function Home() {
                           <select className="select" id="interval" value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value))} disabled={isRecording}>
                             <option value={5}>5초</option>
                             <option value={15}>15초</option>
-                      _B_L_O_C_K_            <option value={30}>30초</option>
+                    <option value={30}>30초</option>
                             <option value={60}>1분</option>
                           </select>
                         </div>
@@ -478,7 +478,7 @@ export default function Home() {
                        {activityLog.length > 0 ? (
                            activityLog.map((log, index) => (
                              <div className="activity-item" key={index}>
-          _B_L_O_C_K_                <span className="activity-time">{log.time}</span>
+                          <span className="activity-time">{log.time}</span>
                                <span className="activity-message">{log.message}</span>
                              </div>
                            ))
@@ -494,7 +494,7 @@ export default function Home() {
                   </div>
                 </div>
               </section>
-        _B_L_O_C_K_   </div>
+           </div>
 
             {/* 오른쪽 컬럼 */}
             <div className="col-right">
@@ -573,7 +573,7 @@ export default function Home() {
                       <label htmlFor="autoSummaryToggle">매일 자정에 자동 요약 생성</label>
                       <label className="toggle-switch">
                         <input type="checkbox" id="autoSummaryToggle" checked={autoSummaryEnabled} onChange={(e) => handleAutoSummaryToggle(e.target.checked)} />
-              _B_L_O_C_K_          <span className="slider"></span>
+                        <span className="slider"></span>
                       </label>
                     </div>
                     {/* 오늘 요약 생성 버튼 */}
