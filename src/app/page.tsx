@@ -347,7 +347,7 @@ export default function Home() {
   // 로그인되지 않은 상태
   if (!session) {
     return (
-        <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <main className="login-outer">
            <div className="login-container">
                <button className="close-button" onClick={handleCloseWindow}>×</button>
                <div className="login-header">
@@ -399,7 +399,7 @@ export default function Home() {
       </header>
 
       {/* 메인 콘텐츠 */}
-      <main className="main-content">
+      <main className="app-outer main-content">
         <div className="container">
           <div className="grid">
             {/* 왼쪽 컬럼 */}

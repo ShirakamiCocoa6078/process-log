@@ -401,6 +401,24 @@ main {
   gap: 1.5rem;
 }
 
+/* 로그인 화면용 wrapper (헤더 높이 80px를 고려하여 중앙 정렬) */
+.login-outer {
+  display: flex;
+  justify-content: center; /* 가로 가운데 */
+  align-items: center;     /* 세로 가운데 */
+  min-height: calc(100vh - 80px); /* 헤더 높이(80px) 제외 */
+  padding-top: 80px; /* 헤더 공간 확보 */
+}
+
+/* 로그인 이후의 앱 화면 전체를 중앙 정렬 (헤더 높이 고려) */
+.app-outer {
+  display: flex;
+  justify-content: center; /* 가로 가운데 정렬 */
+  align-items: center;     /* 세로 가운데 정렬 */
+  min-height: calc(100vh - 80px); /* 헤더 높이(80px) 제외 */
+  padding-top: 80px; /* 헤더 공간 확보 */
+}
+
 /* 画面幅が1000px "以下" になった場合に1列にする */
 @media (max-width: 1000px) {
   .grid {
