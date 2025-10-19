@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, ChangeEvent } from 'react'; //
 import Image from 'next/image';
 
 // --------------------------------------------------
-// 타입 정의: Electron Preload 및 상태
+// 型定義: Electron Preload と状態
 // --------------------------------------------------
 type SettingsData = {
   interval?: number;
@@ -41,7 +41,7 @@ declare global {
   }
 }
 // --------------------------------------------------
-// 메인 컴포넌트
+// メインコンポーネント
 // --------------------------------------------------
 export default function Home() {
   const { data: session, status } = useSession();
@@ -138,7 +138,7 @@ export default function Home() {
           setIntervalSec(settings.interval ?? 5);
           setResolution(String(settings.resolution ?? '1.0'));
           setDeleteAfterUpload(settings.deleteAfterUpload ?? false);
-          addLog('로컬 설정을 불러왔습니다.');
+          addLog('ローカル設定を読み込みました。');
         } catch (error) {
           addLog(`로컬 설정 로드 오류: ${(error as Error).message}`);
         }
@@ -151,15 +151,15 @@ export default function Home() {
               const data = await response.json();
               if (data.status === 'success') {
                 setAutoSummaryEnabled(data.autoSummaryEnabled);
-                addLog('자동 요약 설정을 서버에서 불러왔습니다.');
+                addLog('自動要約設定をサーバーから読み込みました。');
               } else {
-                 addLog(`자동 요약 설정 로드 실패: ${data.message}`);
+                 addLog(`自動要約設定の読み込み失敗: ${data.message}`);
               }
             } else {
-                 addLog(`자동 요약 설정 로드 실패 (HTTP ${response.status}): ${response.statusText}`);
+                 addLog(`自動要約設定の読み込み失敗 (HTTP ${response.status}): ${response.statusText}`);
             }
           } catch (error) {
-            addLog(`자동 요약 설정 API 호출 오류: ${(error as Error).message}`);
+            addLog(`自動要約設定 API 呼び出しエラー: ${(error as Error).message}`);
           }
       }
       setSettingsLoaded(true); // 모든 설정 로드 시도 완료
@@ -180,7 +180,7 @@ export default function Home() {
             deleteAfterUpload: deleteAfterUpload,
           });
         } catch (error) {
-          addLog(`로컬 설정 저장 오류: ${(error as Error).message}`);
+          addLog(`ローカル設定保存エラー: ${(error as Error).message}`);
         }
       }
     };
@@ -200,7 +200,7 @@ export default function Home() {
           setUploadedCount(stats.uploadedCount);
           // 대기 파일 수는 통계 업데이트 시 같이 반영됨
         } catch (error) {
-          addLog(`통계 업데이트 오류: ${(error as Error).message}`);
+          addLog(`統計更新エラー: ${(error as Error).message}`);
         }
       }
       if (window.electronAPI?.listScreenshots) {
@@ -208,7 +208,7 @@ export default function Home() {
           const previews = await window.electronAPI.listScreenshots(4);
           setPreviewImages(previews);
         } catch (error) {
-          addLog(`미리보기 업데이트 오류: ${(error as Error).message}`);
+          addLog(`プレビュー更新エラー: ${(error as Error).message}`);
         }
       }
     };
@@ -340,8 +340,8 @@ export default function Home() {
   };
 
   // --- 렌더링 ---
-  if (status === 'loading' || !settingsLoaded) {
-    return <main className="main-content"><p>Loading...</p></main>;
+    if (status === 'loading' || !settingsLoaded) {
+    return <main className="main-content"><p>読み込み中...</p></main>;
   }
 
   // 로그인되지 않은 상태
@@ -351,11 +351,11 @@ export default function Home() {
            <div className="login-container">
                <button className="close-button" onClick={handleCloseWindow}>×</button>
                <div className="login-header">
-                 <h1>로그인</h1>
+                 <h1>ログイン</h1>
                  <p>Screen Capture AI</p>
                </div>
                <AuthButton />
-               {/* 다크 모드 토글 (로그인 화면에도 추가 가능) */}
+               {/* ダークモードのトグル（ログイン画面にも追加可能） */}
            </div>
         </main>
       );
@@ -390,9 +390,9 @@ export default function Home() {
                       <input type="checkbox" onChange={(e) => handleDarkModeToggle(e.target.checked)} defaultChecked={typeof window !== 'undefined' && localStorage.getItem('darkMode') === '1'} />
                       <span className="slider"></span>
                   </label>
-                  <span style={{ fontSize: '0.8rem'}}>다크 모드</span>
+                  <span style={{ fontSize: '0.8rem'}}>ダークモード</span>
               </div>
-              <button onClick={() => signOut()} className="btn btn-secondary btn-sm">로그아웃</button>
+              <button onClick={() => signOut()} className="btn btn-secondary btn-sm">ログアウト</button>
             </div>
           </div>
         </div>
@@ -407,21 +407,21 @@ export default function Home() {
               <section className="card">
                 <div style={{ flex: '7.5', display: 'flex', flexDirection: 'column' }}>
                     <div className="card-header">
-                      <h3 className="card-title">자동 스크린샷 설정</h3>
+                      <h3 className="card-title">自動スクリーンショット設定</h3>
                     </div>
                     <div className="card-content">
                        <div className="control-section">
                         <div className="form-group">
-                          <label htmlFor="interval">캡처 간격 (초):</label>
+                          <label htmlFor="interval">キャプチャ間隔（秒）:</label>
                           <select className="select" id="interval" value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value))} disabled={isRecording}>
-                            <option value={5}>5초</option>
-                            <option value={15}>15초</option>
-                    <option value={30}>30초</option>
-                            <option value={60}>1분</option>
+          <option value={5}>5秒</option>
+          <option value={15}>15秒</option>
+        <option value={30}>30秒</option>
+          <option value={60}>1分</option>
                           </select>
                         </div>
                         <div className="form-group">
-                          <label htmlFor="resolution">해상도 스케일:</label>
+                          <label htmlFor="resolution">解像度スケール:</label>
                           <select className="select" id="resolution" value={resolution} onChange={(e) => setResolution(e.target.value)} disabled={isRecording}>
                             <option value="1.0">100%</option>
                             <option value="0.75">75%</option>
@@ -433,29 +433,29 @@ export default function Home() {
                           className={`btn btn-large btn-full ${isRecording ? 'btn-destructive' : 'btn-primary'}`}
                           id={isRecording ? 'btn-stop' : 'btn-start'}
                         >
-                          {isRecording ? '캡처 중지' : '캡처 시작'}
+                          {isRecording ? 'キャプチャ停止' : 'キャプチャ開始'}
                         </button>
                       </div>
                       <div className="stats-grid">
                         <div className="stat-card">
-                          <div className="stat-label">촬영 매수</div>
+                          <div className="stat-label">撮影枚数</div>
                           <div className="stat-value">{totalShots}</div>
                         </div>
                         <div className="stat-card">
-                          <div className="stat-label">총 용량</div>
+                          <div className="stat-label">合計容量</div>
                           <div className="stat-value">{(totalSize / (1024 * 1024)).toFixed(1)} <span style={{fontSize: '1rem'}}>MB</span></div>
                         </div>
                         <div className="stat-card">
-                          <div className="stat-label">업로드 완료</div>
+                          <div className="stat-label">アップロード完了</div>
                           <div className="stat-value">{uploadedCount}</div>
                         </div>
                       </div>
                     </div>
                      <div className="card-content" style={{ borderTop: '1px solid var(--border)' }}>
                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                             {/* 대기 파일 수 표시는 totalShots를 사용 */}
-                             <h4>최근 스크린샷 (대기: {totalShots}개)</h4>
-                              {/* 업로드 큐 확인 버튼은 제거 (자동 업데이트 되므로) */}
+                             {/* 待機ファイル数は totalShots を使用 */}
+                             <h4>最新スクリーンショット（待機: {totalShots}枚）</h4>
+                              {/* アップロードキュー確認ボタンは削除（自動更新されるため） */}
                          </div>
                          <div id="isCapturing" style={{ display: 'flex', gap: '8px', overflowX: 'auto', minHeight: '100px', alignItems: 'center' }}>
                            {previewImages.length > 0 ? (
@@ -463,7 +463,7 @@ export default function Home() {
                                <img key={index} src={dataUrl} alt={`preview-${index}`} style={{ height: '100px', width: 'auto', borderRadius: '4px', border: '1px solid var(--border)' }} />
                              ))
                            ) : (
-                             <p style={{ color: 'var(--muted-foreground)' }}>{isRecording ? '캡처 진행 중...' : '미리보기 없음'}</p>
+                             <p style={{ color: 'var(--muted-foreground)' }}>{isRecording ? 'キャプチャ中...' : 'プレビューなし'}</p>
                            )}
                          </div>
                      </div>
@@ -471,19 +471,19 @@ export default function Home() {
 
                 <div style={{ flex: '2.5', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
                   <div className="card-header">
-                      <h4 className="card-title">활동 로그</h4>
+                      <h4 className="card-title">アクティビティログ</h4>
                   </div>
                   <div className="card-content" style={{ flexGrow: 1, overflow: 'hidden' }}>
                     <div className="activity-list" style={{ height: 'calc(100% - 20px)', overflowY: 'auto' }}>
                        {activityLog.length > 0 ? (
                            activityLog.map((log, index) => (
                              <div className="activity-item" key={index}>
-                          <span className="activity-time">{log.time}</span>
+                               <span className="activity-time">{log.time}</span>
                                <span className="activity-message">{log.message}</span>
                              </div>
                            ))
                        ) : (
-                           <p style={{ color: 'var(--muted-foreground)'}}>로그 없음</p>
+                           <p style={{ color: 'var(--muted-foreground)'}}>ログがありません</p>
                        )}
                     </div>
                     <div className={`ai-dots ${isRecording ? 'running' : ''}`} style={{ marginTop: '10px' }}>
@@ -500,13 +500,13 @@ export default function Home() {
             <div className="col-right">
                 <section className="card">
                 <div className="card-content" style={{width: '100%'}}>
-                  <div className="card-header" style={{padding: 0, marginBottom: '1rem'}}>
-                     <h4 className="card-title">수동 레포트 생성</h4>
-                  </div>
+              <div className="card-header" style={{padding: 0, marginBottom: '1rem'}}>
+              <h4 className="card-title">手動レポート作成</h4>
+            </div>
                   <div className="report-section">
                     {/* 기간 선택 */}
                     <div className="form-group">
-                      <label htmlFor="reportStartDate">시작 날짜:</label>
+                      <label htmlFor="reportStartDate">開始日:</label>
                       <input
                         type="date"
                         id="reportStartDate"
@@ -517,7 +517,7 @@ export default function Home() {
                       />
                     </div>
                     <div className="form-group">
-                      <label htmlFor="reportEndDate">종료 날짜:</label>
+                      <label htmlFor="reportEndDate">終了日:</label>
                       <input
                         type="date"
                         id="reportEndDate"
@@ -530,7 +530,7 @@ export default function Home() {
                     </div>
                     {/* 파일 형식 선택 */}
                     <div className="form-group">
-                      <label htmlFor="reportFormat">파일 형식:</label>
+                      <label htmlFor="reportFormat">ファイル形式:</label>
                       <select
                         id="reportFormat"
                         className="select"
@@ -550,19 +550,19 @@ export default function Home() {
                       className="btn btn-primary btn-large btn-full"
                       style={{ marginTop: '1rem' }}
                     >
-                      {isGeneratingReport ? '생성 중...' : '레포트 생성 및 다운로드'}
+                      {isGeneratingReport ? '作成中...' : 'レポート作成とダウンロード'}
                     </button>
                   </div>
                 </div>
               </section>
               <section className="card">
                 <div className="card-content" style={{width: '100%'}}>
-                  <div className="card-header" style={{padding: 0, marginBottom: '1rem'}}>
-                     <h4 className="card-title">기능 설정</h4>
-                  </div>
+              <div className="card-header" style={{padding: 0, marginBottom: '1rem'}}>
+              <h4 className="card-title">機能設定</h4>
+            </div>
                   <div className="report-section">
                     <div style={{ marginBottom: 15, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <label htmlFor="deleteAfterUploadToggle">전송 후 스크린샷 삭제</label>
+                      <label htmlFor="deleteAfterUploadToggle">送信後にスクリーンショットを削除する</label>
                       <label className="toggle-switch">
                         <input type="checkbox" id="deleteAfterUploadToggle" checked={deleteAfterUpload} onChange={(e) => setDeleteAfterUpload(e.target.checked)} />
                         <span className="slider"></span>
@@ -570,7 +570,7 @@ export default function Home() {
                     </div>
                     {/* 👇 [추가] 자동 일일 요약 토글 */}
                     <div style={{ marginBottom: 15, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <label htmlFor="autoSummaryToggle">매일 자정에 자동 요약 생성</label>
+                      <label htmlFor="autoSummaryToggle">毎日深夜に自動要約を生成</label>
                       <label className="toggle-switch">
                         <input type="checkbox" id="autoSummaryToggle" checked={autoSummaryEnabled} onChange={(e) => handleAutoSummaryToggle(e.target.checked)} />
                         <span className="slider"></span>
@@ -583,7 +583,7 @@ export default function Home() {
                       className="btn btn-primary btn-large btn-full"
                       style={{ marginTop: '1rem' }}
                     >
-                      {isLoadingSummary ? '생성 중...' : '오늘 요약 생성하기'}
+                      {isLoadingSummary ? '作成中...' : '今日の要約を作成する'}
                     </button>
                     {summary && (
                       <div style={{ marginTop: '1rem', padding: '10px', border: '1px solid var(--border)', background: 'var(--background)', maxHeight: '300px', overflowY: 'auto' }}>
