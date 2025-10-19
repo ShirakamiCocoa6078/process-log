@@ -1,5 +1,5 @@
 // src/app/api/summary/[date]/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromAuth } from '@/lib/auth'; // 4단계 인증 헬퍼
 
@@ -7,7 +7,8 @@ import { getUserIdFromAuth } from '@/lib/auth'; // 4단계 인증 헬퍼
 // context.params.date 로 URL의 [date] 부분을 받을 수 있습니다.
 export async function GET(
   request: NextRequest,
-  { params }: { params: { date: string } }
+  // @ts-ignore
+  context: { params: { date: string } }
 ) {
   try {
     // 1. 인증
@@ -17,6 +18,7 @@ export async function GET(
     }
 
     // 2. URL 파라미터에서 날짜 문자열(YYYY-MM-DD) 가져오기
+    const params = context.params as { date: string };
     const dateString = params.date;
     if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
         return NextResponse.json({ status: 'error', message: '날짜 형식이 잘못되었습니다 (YYYY-MM-DD).' }, { status: 400 });
@@ -51,6 +53,8 @@ export async function GET(
     });
 
   } catch (error) {
+    // @ts-ignore
+    const params = context.params as { date: string };
     console.error(`[API /api/summary/${params.date} Error]`, error);
     return NextResponse.json({ status: 'error', message: '요약 조회 중 오류 발생' }, { status: 500 });
   }
