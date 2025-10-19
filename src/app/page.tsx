@@ -450,8 +450,6 @@ export default function Home() {
           </div>
         </div>
       </main>
-
-      {/* 하단 로그 바 제거됨 */}
     </>
   );
 }
