@@ -55,6 +55,10 @@ export default function Home() {
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false); // 설정 로드 완료 여부
   const [autoSummaryEnabled, setAutoSummaryEnabled] = useState<boolean>(false); // 👈 [추가] 자동 요약 상태
+  const [reportStartDate, setReportStartDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [reportEndDate, setReportEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [reportFormat, setReportFormat] = useState<string>('md'); // 기본값 Markdown
+  const [isGeneratingReport, setIsGeneratingReport] = useState<boolean>(false);
 
   // --- 통계 상태 ---
   const [totalShots, setTotalShots] = useState<number>(0);
@@ -92,7 +96,49 @@ export default function Home() {
         return [{ time, message: cleanMessage }, ...prev].slice(0, 100);
     });
   }, []);
+  const handleGenerateReport = async () => {
+    setIsGeneratingReport(true);
+    addLog(`레포트 생성 중 (${reportStartDate} ~ ${reportEndDate}, 형식: ${reportFormat})...`);
 
+    try {
+      const response = await fetch('/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate: reportStartDate,
+          endDate: reportEndDate,
+          format: reportFormat,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.status === 'success' && data.reportContent) {
+        addLog(data.message || '레포트 생성 완료.');
+        // 클라이언트 측에서 Markdown 다운로드 처리
+        downloadMarkdown(data.fileName, data.reportContent);
+      } else {
+        addLog(`레포트 생성 실패: ${data.message || '내용 없음'}`);
+      }
+    } catch (error) {
+      addLog(`레포트 생성 API 호출 오류: ${(error as Error).message}`);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  // --- [추가] Markdown 다운로드 헬퍼 함수 ---
+  const downloadMarkdown = (filename: string, text: string) => {
+    const element = document.createElement('a');
+    // UTF-8 인코딩 및 BOM(Byte Order Mark) 추가 (Excel 등 호환성)
+    const blob = new Blob(['\uFEFF' + text], { type: 'text/markdown;charset=utf-8;' });
+    element.href = URL.createObjectURL(blob);
+    element.download = filename;
+    document.body.appendChild(element); // Required for this to work in FireFox
+    element.click();
+    document.body.removeChild(element);
+    addLog(`"${filename}" 파일 다운로드 시작됨.`);
+  };
   // --- useEffect: 설정 로드 (마운트 시 1회) ---
   useEffect(() => {
     const loadSettings = async () => {
@@ -501,6 +547,63 @@ export default function Home() {
 
             {/* 오른쪽 컬럼 */}
             <div className="col-right">
+                <section className="card">
+                <div className="card-content" style={{width: '100%'}}>
+                  <div className="card-header" style={{padding: 0, marginBottom: '1rem'}}>
+                     <h4 className="card-title">수동 레포트 생성</h4>
+                  </div>
+                  <div className="report-section">
+                    {/* 기간 선택 */}
+                    <div className="form-group">
+                      <label htmlFor="reportStartDate">시작 날짜:</label>
+                      <input
+                        type="date"
+                        id="reportStartDate"
+                        className="input"
+                        value={reportStartDate}
+                        onChange={(e) => setReportStartDate(e.target.value)}
+                        max={reportEndDate} // 시작일은 종료일보다 늦을 수 없음
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="reportEndDate">종료 날짜:</label>
+                      <input
+                        type="date"
+                        id="reportEndDate"
+                        className="input"
+                        value={reportEndDate}
+                        onChange={(e) => setReportEndDate(e.target.value)}
+                        min={reportStartDate} // 종료일은 시작일보다 빠를 수 없음
+                        max={new Date().toISOString().split('T')[0]} // 오늘 이후 선택 불가
+                      />
+                    </div>
+                    {/* 파일 형식 선택 */}
+                    <div className="form-group">
+                      <label htmlFor="reportFormat">파일 형식:</label>
+                      <select
+                        id="reportFormat"
+                        className="select"
+                        value={reportFormat}
+                        onChange={(e) => setReportFormat(e.target.value)}
+                      >
+                        <option value="md">Markdown (.md)</option>
+                        {/* <option value="docx" disabled>Word (.docx) - 준비 중</option>
+                        <option value="pdf" disabled>PDF (.pdf) - 준비 중</option> */}
+                      </select>
+                    </div>
+
+                    {/* 생성 버튼 */}
+                    <button
+                      onClick={handleGenerateReport}
+                      disabled={isGeneratingReport || !reportStartDate || !reportEndDate || reportStartDate > reportEndDate}
+                      className="btn btn-primary btn-large btn-full"
+                      style={{ marginTop: '1rem' }}
+                    >
+                      {isGeneratingReport ? '생성 중...' : '레포트 생성 및 다운로드'}
+                    </button>
+                  </div>
+                </div>
+              </section>
               <section className="card">
                 <div className="card-content" style={{width: '100%'}}>
                   <div className="card-header" style={{padding: 0, marginBottom: '1rem'}}>
