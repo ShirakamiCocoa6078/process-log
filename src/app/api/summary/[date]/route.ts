@@ -7,7 +7,7 @@ import { getUserIdFromAuth } from '@/lib/auth'; // 4단계 인증 헬퍼
 // context.params.date 로 URL의 [date] 부분을 받을 수 있습니다.
 export async function GET(
   request: NextRequest,
-  // @ts-expect-error
+  // @ts-expect-error // Next.js App Router context typing issue
   context: { params: { date: string } }
 ) {
   try {
@@ -53,7 +53,7 @@ export async function GET(
     });
 
   } catch (error) {
-    // @ts-expect-error
+    // @ts-expect-error // Next.js App Router context typing issue
     const params = context.params as { date: string };
     console.error(`[API /api/summary/${params.date} Error]`, error);
     return NextResponse.json({ status: 'error', message: '요약 조회 중 오류 발생' }, { status: 500 });
