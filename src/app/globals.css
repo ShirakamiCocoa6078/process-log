@@ -1,5 +1,6 @@
 /* Refering styles.css merged into globals.css */
 /* Reset and Base Styles */
+/* ダークモード: body.dark に対する変数上書き */
 * {
 	margin: 0;
 	padding: 0;
@@ -12,7 +13,7 @@
 	--card: #ffffff;
 	--card-foreground: #333333;
 	--primary: #007bff;
-	--primary-foreground: #ffffff;
+  padding-top: 80px; /* ヘッダーの高さに合わせて調整 */
 	--secondary: #6c757d;
 	--secondary-foreground: #ffffff;
 	--muted: #6c757d;
@@ -24,7 +25,7 @@
 	--border: #dee2e6;
 	--success: #28a745;
 	--info: #17a2b8;
-	--radius: 8px;
+  position: fixed; /* ヘッダーを固定 */
 	transition: all 0.3s;
 }
 
@@ -36,7 +37,7 @@ body.dark {
 	--card-foreground: #ffffff;
 	--muted-foreground: #ffffff;
 	--border: #111111;
-	transition: all 0.3s;
+  /* この3行で、中央の要素が上下左右の中央に来ます */
 }
 
 /* Preserve compatibility with refering's data-theme dark selector */
@@ -51,6 +52,7 @@ body.dark {
 }
 
 
+/* AI ドット */
 body {
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", sans-serif;
 	background-color: var(--background);
@@ -60,13 +62,15 @@ body {
 	transition: all 0.3s;
 	padding-top: 80px; /* ヘッダーの高さに応じて調整 */
 }
-
+.start-btn { background: #2ecc71 } /* 録画開始 - 緑 */
 /* Container */
 .container {
 	max-width: 1400px;
 	margin: 0 auto;
 	padding: 0 1rem;
 }
+
+/* 録画ボタンの色 (ユーザー要求) */
 
 /* Header */
 .header {

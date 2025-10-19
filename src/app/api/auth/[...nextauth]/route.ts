@@ -5,10 +5,10 @@ import { prisma } from '@/lib/prisma';
 import NextAuth, { AuthOptions } from 'next-auth';
 
 export const authOptions: AuthOptions = {
-  // 1. Prisma Adapter 설정
+  // 1. Prisma Adapter 設定
   adapter: PrismaAdapter(prisma),
 
-  // 2. Provider 설정 (Google)
+  // 2. Provider 設定 (Google)
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -16,13 +16,13 @@ export const authOptions: AuthOptions = {
     }),
   ],
 
-  // 3. 세션 전략
+  // 3. セッション戦略
   session: {
     strategy: 'database',
   },
 
-  // 4. 콜백 설정 (★★★★★ 중요 ★★★★★)
-  // 세션에 userId를 포함시켜야 API가 사용자를 식별할 수 있습니다.
+  // 4. コールバック設定 (★★★★★ 重要 ★★★★★)
+  // セッションに userId を含める必要があります。API がユーザーを識別できます。
   callbacks: {
     async session({ session, token }) {
       // token.sub은 JWT의 subject이며, Prisma Adapter가 user.id로 설정해줍니다.

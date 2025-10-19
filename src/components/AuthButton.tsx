@@ -7,33 +7,33 @@ export default function AuthButton() {
   const { data: session, status } = useSession();
 
   if (status === 'loading') {
-    return <p>인증 상태 확인 중...</p>;
+    return <p>認証状態を確認しています…</p>;
   }
 
   if (session) {
-    // 로그인 된 상태
+    // ログイン済みの状態
     return (
       <div>
-        <p>환영합니다, {session.user?.email}</p>
+        <p>ようこそ、{session.user?.email}</p>
         <button 
           onClick={() => signOut()} 
           style={{ padding: '10px', color: 'white', background: 'red' }}
         >
-          로그아웃
+          ログアウト
         </button>
       </div>
     );
   }
 
-  // 로그인 안 된 상태
+  // ログインしていない状態
   return (
     <div>
-      <p>로그인되지 않았습니다.</p>
+      <p>ログインされていません。</p>
       <button 
         onClick={() => signIn('google')} 
         style={{ padding: '10px', color: 'white', background: 'blue' }}
       >
-        Google 계정으로 로그인
+        Google アカウントでログイン
       </button>
     </div>
   );

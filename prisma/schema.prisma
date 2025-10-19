@@ -2,7 +2,7 @@
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL") // Neon DB 연결 문자열
+  url      = env("DATABASE_URL") // Neon DB 接続文字列
 }
 
 generator client {
@@ -10,7 +10,7 @@ generator client {
 }
 
 // ----------------------------------------------
-// 1. 인증 모델 (NextAuth.js 표준)
+// 1. 認証モデル (NextAuth.js 標準)
 // ----------------------------------------------
 
 model User {
@@ -70,7 +70,7 @@ model VerificationToken {
 
 model personalTaskLog {
   userId     String
-  taskDateId DateTime @db.Date // 날짜 (YYYY-MM-DD)
+  taskDateId DateTime @db.Date // 日付 (YYYY-MM-DD)
   taskTempTxt Json?
   taskContent String?
   createdAt   DateTime @default(now())
