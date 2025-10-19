@@ -3,7 +3,7 @@
 
 import AuthButton from '@/components/AuthButton';
 import { useSession, signOut } from 'next-auth/react';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, ChangeEvent } from 'react'; // 👈 ChangeEvent 추가
 import Image from 'next/image';
 
 // --------------------------------------------------
@@ -66,6 +66,15 @@ export default function Home() {
 
   // --- 활동 로그 상태 ---
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+
+  // --- [추가] 과거 요약 상태 ---
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    // 기본값: 오늘 날짜 (YYYY-MM-DD 형식)
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [pastSummary, setPastSummary] = useState<string | null>(null);
+  const [isLoadingPastSummary, setIsLoadingPastSummary] = useState<boolean>(false);
 
   // --- 로그 추가 함수 ---
   const addLog = useCallback((message: string) => {
@@ -191,6 +200,14 @@ export default function Home() {
     };
   }, [addLog]); // addLog가 useCallback으로 감싸져 있어 한번만 실행됨
 
+  // --- [추가] useEffect: 컴포넌트 마운트 시 오늘 날짜의 요약 미리 로드 ---
+  useEffect(() => {
+      if(session && settingsLoaded) { // 로그인 및 설정 로드 완료 후 실행
+          handleFetchPastSummary(selectedDate); // 초기 selectedDate (오늘) 로드
+      }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, settingsLoaded]); // handleFetchPastSummary는 useCallback으로 감싸져 불필요
+
   // --- 핸들러 함수들 ---
   const handleStartCapture = async () => {
     console.log('캡처 시작 버튼 클릭됨!');
@@ -268,6 +285,38 @@ export default function Home() {
   const handleDarkModeToggle = (isChecked: boolean) => {
     document.body.classList.toggle('dark', isChecked);
     try { localStorage.setItem('darkMode', isChecked ? '1' : '0'); } catch {}
+  };
+
+  // --- [추가] 과거 요약 조회 핸들러 ---
+  const handleFetchPastSummary = useCallback(async (dateToFetch: string) => {
+    if (!dateToFetch) return;
+    setIsLoadingPastSummary(true);
+    setPastSummary(null); // 이전 결과 초기화
+    addLog(`${dateToFetch} 요약 조회 중...`);
+
+    try {
+      const response = await fetch(`/api/summary/${dateToFetch}`); // GET 요청
+      const data = await response.json();
+
+      if (response.ok && data.status === 'success') {
+        setPastSummary(data.summary); // null 또는 Markdown 저장
+        addLog(`${dateToFetch}: ${data.message || (data.summary ? '요약 로드 완료.' : '요약 없음.')}`);
+      } else {
+        addLog(`과거 요약 조회 실패 (${dateToFetch}): ${data.message}`);
+      }
+    } catch (error) {
+      addLog(`과거 요약 API 호출 오류 (${dateToFetch}): ${(error as Error).message}`);
+    } finally {
+      setIsLoadingPastSummary(false);
+    }
+  }, [addLog]); // addLog 의존성 추가
+
+  // --- [추가] 날짜 선택 변경 핸들러 ---
+  const handleDateChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const newDate = event.target.value;
+    setSelectedDate(newDate);
+    // 날짜가 변경되면 해당 날짜의 요약을 자동으로 조회
+    handleFetchPastSummary(newDate);
   };
 
   // --- [추가] 자동 요약 토글 핸들러 ---
@@ -370,7 +419,7 @@ export default function Home() {
                           <select className="select" id="interval" value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value))} disabled={isRecording}>
                             <option value={5}>5초</option>
                             <option value={15}>15초</option>
-                            <option value={30}>30초</option>
+                      _B_L_O_C_K_            <option value={30}>30초</option>
                             <option value={60}>1분</option>
                           </select>
                         </div>
@@ -432,7 +481,7 @@ export default function Home() {
                        {activityLog.length > 0 ? (
                            activityLog.map((log, index) => (
                              <div className="activity-item" key={index}>
-                               <span className="activity-time">{log.time}</span>
+          _B_L_O_C_K_                <span className="activity-time">{log.time}</span>
                                <span className="activity-message">{log.message}</span>
                              </div>
                            ))
@@ -448,7 +497,7 @@ export default function Home() {
                   </div>
                 </div>
               </section>
-            </div>
+        _B_L_O_C_K_   </div>
 
             {/* 오른쪽 컬럼 */}
             <div className="col-right">
@@ -470,7 +519,7 @@ export default function Home() {
                       <label htmlFor="autoSummaryToggle">매일 자정에 자동 요약 생성</label>
                       <label className="toggle-switch">
                         <input type="checkbox" id="autoSummaryToggle" checked={autoSummaryEnabled} onChange={(e) => handleAutoSummaryToggle(e.target.checked)} />
-                        <span className="slider"></span>
+              _B_L_O_C_K_          <span className="slider"></span>
                       </label>
                     </div>
                     {/* 오늘 요약 생성 버튼 */}
@@ -492,11 +541,38 @@ export default function Home() {
                   </div>
                 </div>
               </section>
-              {/* 과거 레포트 카드 (향후 구현) */}
+              
+              {/* 👇 [수정] 과거 요약 카드 */}
               <section className="card">
-                <div className="card-header"><h4 className="card-title">과거 요약</h4></div>
+                <div className="card-header">
+                  <h4 className="card-title">과거 요약 조회</h4>
+                </div>
                 <div className="card-content">
-                  <p style={{ color: 'var(--muted-foreground)'}}>향후 구현될 기능입니다.</p>
+                  {/* 날짜 선택 input */}
+                  <div className="form-group">
+                    <label htmlFor="summaryDate">날짜 선택:</label>
+                    <input
+                      type="date"
+                      id="summaryDate"
+                      className="input"
+                      value={selectedDate}
+                      onChange={handleDateChange}
+                      max={new Date().toISOString().split('T')[0]} // 오늘 이후 날짜 선택 불가
+                    />
+                  </div>
+
+                  {/* 요약 결과 표시 */}
+                  <div style={{ marginTop: '1rem', padding: '10px', border: '1px solid var(--border)', background: 'var(--background)', minHeight: '100px', maxHeight: '300px', overflowY: 'auto' }}>
+                    {isLoadingPastSummary ? (
+                      <p style={{ color: 'var(--muted-foreground)' }}>로딩 중...</p>
+                    ) : pastSummary ? (
+                      <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontSize: '0.875rem' }}>
+                        {pastSummary}
+                      </pre>
+                    ) : (
+                      <p style={{ color: 'var(--muted-foreground)' }}>선택한 날짜의 요약이 없습니다.</p>
+                    )}
+                  </div>
                 </div>
               </section>
             </div>
