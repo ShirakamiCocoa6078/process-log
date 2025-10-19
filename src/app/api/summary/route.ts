@@ -2,8 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { getUserIdFromAuth } from '@/lib/auth';
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
@@ -65,15 +64,11 @@ async function requestSummaryFromOpenAI(contentToSummarize: string) {
 // ----------------------------------------------------------------
 export async function POST(request: NextRequest) {
   try {
-    // 1. 인증 (쿠키에서 세션 가져오기)
-    const session = await getServerSession(authOptions); 
-
-    if (!session || !session.user || !session.user.id) {
-      // 세션이 없거나(로그인 안됨), 세션에 user.id가 없음
+    // 1. 인증 (헤더 또는 쿠키 확인)
+    const userId = await getUserIdFromAuth(request); //  헬퍼 재사용
+    if (!userId) {
       return NextResponse.json({ status: 'error', message: '인증 실패' }, { status: 401 });
     }
-
-    const userId = session.user.id;
 
     // 2. 오늘 날짜 (UTC 기준)
     const today = new Date();
