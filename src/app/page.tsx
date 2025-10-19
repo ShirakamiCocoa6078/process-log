@@ -162,9 +162,75 @@ export default function Home() {
   }, [addLog]); // addLog가 useCallback으로 감싸져 있어 한번만 실행됨
 
   // --- 핸들러 함수들 ---
-  const handleStartCapture = async () => { /* 이전과 동일 */ };
-  const handleStopCapture = async () => { /* 이전과 동일 */ };
-  const handleGenerateSummary = async () => { /* 이전과 동일 */ };
+  const handleStartCapture = async () => {
+    console.log('캡처 시작 버튼 클릭됨!'); // 디버깅 로그
+    if (!window.electronAPI) {
+      addLog('Electron API를 찾을 수 없습니다.');
+      return;
+    }
+    addLog('캡처 시작 요청 중...');
+    const settings = { interval: intervalSec, resolution: parseFloat(resolution) };
+    try { // [추가] try...catch 블록
+      const result = await window.electronAPI.startCapture(settings);
+      if (result.success) {
+        setIsRecording(true);
+        addLog('캡처 시작됨.'); // addLog 사용
+      } else {
+        addLog(`캡처 시작 실패: ${result.message}`); // addLog 사용
+      }
+    } catch (error) {
+       addLog(`[IPC 오류] 캡처 시작: ${(error as Error).message}`); // addLog 사용
+       console.error('[IPC Error] Start Capture:', error);
+    }
+  };
+
+  // 캡처 중지 핸들러
+  const handleStopCapture = async () => {
+    console.log('캡처 중지 버튼 클릭됨!'); // 디버깅 로그
+    if (!window.electronAPI) {
+        addLog('Electron API를 찾을 수 없습니다.');
+        return;
+    };
+    addLog('캡처 중지 요청 중...'); // addLog 사용
+     try { // [추가] try...catch 블록
+        const result = await window.electronAPI.stopCapture();
+        if (result.success) {
+          setIsRecording(false);
+          addLog('캡처 중지됨.'); // addLog 사용
+        } else {
+          addLog(`캡처 중지 실패: ${result.message}`); // addLog 사용
+        }
+    } catch (error) {
+        addLog(`[IPC 오류] 캡처 중지: ${(error as Error).message}`); // addLog 사용
+        console.error('[IPC Error] Stop Capture:', error);
+    }
+  };
+
+  // 오늘 요약 생성 핸들러 (5단계 로직 유지)
+  const handleGenerateSummary = async () => {
+    console.log('요약 생성 버튼 클릭됨!'); // 디버깅 로그
+    setIsLoadingSummary(true);
+    setSummary('');
+    addLog('오늘 활동 요약을 생성 중입니다...'); // addLog 사용
+
+    try {
+      const response = await fetch('/api/summary', {
+        method: 'POST',
+      });
+      const data = await response.json();
+
+      if (response.ok && data.status === 'success') {
+        setSummary(data.summary);
+        addLog('요약 생성 완료.'); // addLog 사용
+      } else {
+        addLog(`요약 생성 실패: ${data.message}`); // addLog 사용
+      }
+    } catch (error) {
+      addLog(`API 호출 오류: ${(error as Error).message}`); // addLog 사용
+      console.error('[API Error] Summary:', error);
+    }
+    setIsLoadingSummary(false);
+  };
 
   // [추가] 창 닫기 핸들러
   const handleCloseWindow = () => {
