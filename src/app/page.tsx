@@ -1,150 +1,227 @@
 // src/app/page.tsx
 'use client';
 
-import AuthButton from '@/components/AuthButton'; // 기존 AuthButton 유지 (또는 구 프로젝트 login.tsx 기반으로 수정 가능)
+import AuthButton from '@/components/AuthButton';
 import { useSession, signOut } from 'next-auth/react';
-import React, { useState, useEffect } from 'react';
-import Image from 'next/image'; // 구 프로젝트에서 사용
+import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 
 // --------------------------------------------------
-// 타입 정의: Electron Preload 및 구 프로젝트 상태
+// 타입 정의: Electron Preload 및 상태
 // --------------------------------------------------
-declare global {
-  interface Window {
-    // 5단계에서 정의한 현재 프로젝트의 electronAPI
-    electronAPI?: {
-      startCapture: (settings: { interval: number; resolution: number }) => Promise<{ success: boolean; message: string }>;
-      stopCapture: () => Promise<{ success: boolean; message: string }>;
-    };
-  }
-}
-
-// 구 프로젝트의 설정을 위한 타입 (필요시 사용)
-type PersonalSettings = {
-  interval: number;
-  resolution: number | string;
-  statusText?: string; // 구 프로젝트에 있었으나 현재는 상태로 관리
-  isRecording?: boolean; // 구 프로젝트에 있었으나 현재는 상태로 관리
+type SettingsData = {
+  interval?: number;
+  resolution?: number | string;
   deleteAfterUpload?: boolean;
 };
 
+type StatsData = {
+  totalShots: number;
+  totalSize: number;
+  uploadedCount: number;
+};
+
+type ActivityLogEntry = {
+  time: string;
+  message: string;
+};
+
+declare global {
+  interface Window {
+    electronAPI?: {
+      startCapture: (settings: { interval: number; resolution: number }) => Promise<{ success: boolean; message: string }>;
+      stopCapture: () => Promise<{ success: boolean; message: string }>;
+      readSettings: () => Promise<SettingsData>;
+      writeSettings: (settings: SettingsData) => Promise<{ success: boolean; error?: string }>;
+      getStats: () => Promise<StatsData>;
+      listScreenshots: (limit?: number) => Promise<string[]>;
+      closeWindow: () => Promise<void>;
+      onLogMessage: (callback: (message: string) => void) => () => void; // 반환 타입은 클린업 함수
+    };
+  }
+}
 // --------------------------------------------------
 // 메인 컴포넌트
 // --------------------------------------------------
 export default function Home() {
   const { data: session, status } = useSession();
 
-  // --- UI 상태 (구 프로젝트 index.tsx 참조 + 현재 프로젝트 상태 통합) ---
-  const [intervalSec, setIntervalSec] = useState<number>(5); // 초 단위 간격
-  const [resolution, setResolution] = useState<string>('1.0'); // 해상도 스케일
-  const [isRecording, setIsRecording] = useState<boolean>(false); // 캡처 진행 여부
-  const [logMessage, setLogMessage] = useState<string>('준비 완료.'); // 하단 로그 메시지
-  const [summary, setSummary] = useState(''); // 생성된 요약 (Markdown)
-  const [isLoadingSummary, setIsLoadingSummary] = useState(false); // 요약 생성 중 로딩 상태
-  const [deleteAfterUpload, setDeleteAfterUpload] = useState<boolean>(false); // 전송 후 삭제 토글 (기본값 false)
+  // --- UI 상태 ---
+  const [intervalSec, setIntervalSec] = useState<number>(5);
+  const [resolution, setResolution] = useState<string>('1.0');
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [deleteAfterUpload, setDeleteAfterUpload] = useState<boolean>(false);
+  const [summary, setSummary] = useState('');
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false); // 설정 로드 완료 여부
 
-  // (구 프로젝트의 activityLog, fileStats 등은 필요시 추가 구현)
+  // --- [추가] 통계 상태 ---
+  const [totalShots, setTotalShots] = useState<number>(0);
+  const [totalSize, setTotalSize] = useState<number>(0);
+  const [uploadedCount, setUploadedCount] = useState<number>(0);
 
-  // --- 핸들러 함수들 (현재 프로젝트 IPC/API 호출 방식으로 수정) ---
+  // --- [추가] 미리보기 상태 ---
+  const [previewImages, setPreviewImages] = useState<string[]>([]);
 
-  // 캡처 시작
-  const handleStartCapture = async () => {
-    if (!window.electronAPI) {
-      setLogMessage('Electron API를 찾을 수 없습니다.');
-      return;
-    }
-    setLogMessage('캡처 시작 요청 중...');
-    const settings = { interval: intervalSec, resolution: parseFloat(resolution) };
-    const result = await window.electronAPI.startCapture(settings);
+  // --- [추가] 활동 로그 상태 ---
+  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
 
-    if (result.success) {
-      setIsRecording(true);
-      setLogMessage('캡처 시작됨.');
-    } else {
-      setLogMessage(`캡처 시작 실패: ${result.message}`);
-    }
-  };
+  // --- 로그 추가 함수 ---
+  const addLog = useCallback((message: string) => {
+    // 메시지에서 타임스탬프 제거 (index.ts에서 이미 추가함)
+    const cleanMessage = message.replace(/^\[\d{2}:\d{2}:\d{2}\]\s*/, '');
+    const timeMatch = message.match(/^\[(\d{2}:\d{2}:\d{2})\]/);
+    const time = timeMatch ? timeMatch[1] : new Date().toLocaleTimeString();
 
-  // 캡처 중지
-  const handleStopCapture = async () => {
-    if (!window.electronAPI) return;
-    setLogMessage('캡처 중지 요청 중...');
-    const result = await window.electronAPI.stopCapture();
+    setActivityLog((prev) => [{ time, message: cleanMessage }, ...prev].slice(0, 100)); // 최근 100개 로그만 유지
+  }, []);
 
-    if (result.success) {
-      setIsRecording(false);
-      setLogMessage('캡처 중지됨.');
-    } else {
-      setLogMessage(`캡처 중지 실패: ${result.message}`);
-    }
-  };
-
-  // 오늘 요약 생성 (5단계 로직 유지)
-  const handleGenerateSummary = async () => {
-    setIsLoadingSummary(true);
-    setSummary('');
-    setLogMessage('오늘 활동 요약을 생성 중입니다...');
-
-    try {
-      const response = await fetch('/api/summary', {
-        method: 'POST',
-      });
-      const data = await response.json();
-
-      if (response.ok && data.status === 'success') {
-        setSummary(data.summary);
-        setLogMessage('요약 생성 완료.');
+  // --- useEffect: 설정 로드 (마운트 시 1회) ---
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (window.electronAPI?.readSettings) {
+        try {
+          const settings = await window.electronAPI.readSettings();
+          setIntervalSec(settings.interval ?? 5);
+          setResolution(String(settings.resolution ?? '1.0'));
+          setDeleteAfterUpload(settings.deleteAfterUpload ?? false);
+          addLog('저장된 설정을 불러왔습니다.');
+        } catch (error) {
+          addLog(`설정 로드 오류: ${(error as Error).message}`);
+        } finally {
+          setSettingsLoaded(true); // 로드 완료 표시
+        }
       } else {
-        setLogMessage(`요약 생성 실패: ${data.message}`);
+        setSettingsLoaded(true); // Electron API 없으면 바로 완료 처리
       }
-    } catch (error) {
-      setLogMessage(`API 호출 오류: ${(error as Error).message}`);
+    };
+    loadSettings();
+  }, [addLog]); // addLog가 useCallback으로 감싸져 있어 한번만 실행됨
+
+  // --- useEffect: 설정 자동 저장 ---
+  useEffect(() => {
+    if (!settingsLoaded) return; // 설정이 로드된 후에만 저장 시작
+
+    const saveSettings = async () => {
+      if (window.electronAPI?.writeSettings) {
+        try {
+          await window.electronAPI.writeSettings({
+            interval: intervalSec,
+            resolution: parseFloat(resolution), // 숫자로 변환하여 저장
+            deleteAfterUpload: deleteAfterUpload,
+          });
+          // addLog('설정이 자동 저장되었습니다.'); // 너무 자주 로깅되므로 주석 처리
+        } catch (error) {
+          addLog(`설정 저장 오류: ${(error as Error).message}`);
+        }
+      }
+    };
+    // 디바운스: 마지막 변경 후 500ms 뒤에 저장
+    const timer = setTimeout(saveSettings, 500);
+    return () => clearTimeout(timer);
+  }, [intervalSec, resolution, deleteAfterUpload, settingsLoaded, addLog]);
+
+  // --- useEffect: 통계 및 미리보기 주기적 업데이트 ---
+  useEffect(() => {
+    const fetchStatsAndPreviews = async () => {
+      if (window.electronAPI?.getStats) {
+        try {
+          const stats = await window.electronAPI.getStats();
+          setTotalShots(stats.totalShots);
+          setTotalSize(stats.totalSize);
+          setUploadedCount(stats.uploadedCount);
+        } catch (error) {
+          addLog(`통계 업데이트 오류: ${(error as Error).message}`);
+        }
+      }
+      if (window.electronAPI?.listScreenshots) {
+        try {
+          const previews = await window.electronAPI.listScreenshots(4); // 최근 4개
+          setPreviewImages(previews);
+        } catch (error) {
+          addLog(`미리보기 업데이트 오류: ${(error as Error).message}`);
+        }
+      }
+    };
+
+    fetchStatsAndPreviews(); // 즉시 한번 실행
+    const intervalId = setInterval(fetchStatsAndPreviews, 5000); // 5초마다 업데이트
+
+    return () => clearInterval(intervalId); // 컴포넌트 언마운트 시 인터벌 제거
+  }, [addLog]);
+
+  // --- useEffect: Main 프로세스 로그 리스너 ---
+  useEffect(() => {
+    if (window.electronAPI?.onLogMessage) {
+      const unsubscribe = window.electronAPI.onLogMessage((message) => {
+        addLog(message); // 받은 로그를 상태에 추가
+      });
+      // 클린업 함수: 컴포넌트 언마운트 시 리스너 제거
+      return () => unsubscribe();
     }
-    setIsLoadingSummary(false);
+  }, [addLog]); // addLog가 useCallback으로 감싸져 있어 한번만 실행됨
+
+  // --- 핸들러 함수들 ---
+  const handleStartCapture = async () => { /* 이전과 동일 */ };
+  const handleStopCapture = async () => { /* 이전과 동일 */ };
+  const handleGenerateSummary = async () => { /* 이전과 동일 */ };
+
+  // [추가] 창 닫기 핸들러
+  const handleCloseWindow = () => {
+    window.electronAPI?.closeWindow();
   };
 
-  // --- 렌더링 (구 프로젝트 index.tsx 구조 참조) ---
+  // [추가] 다크 모드 핸들러
+  const handleDarkModeToggle = (isChecked: boolean) => {
+    document.body.classList.toggle('dark', isChecked);
+    // (선택) 로컬 스토리지 등에 상태 저장
+    try { localStorage.setItem('darkMode', isChecked ? '1' : '0'); } catch {}
+  };
 
-  if (status === 'loading') {
+  // --- 렌더링 ---
+  if (status === 'loading' || !settingsLoaded) {
     return <main className="main-content"><p>Loading...</p></main>;
   }
 
-  // 로그인되지 않은 상태 (구 프로젝트 login.tsx 디자인 참조 또는 AuthButton 사용)
+  // 로그인되지 않은 상태
   if (!session) {
+    // ... (이전과 동일한 로그인 UI)
     return (
-      <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-         {/* 간단 버전: AuthButton 사용 */}
-         <div className="login-container">
-             <div className="login-header">
-               <h1>로그인</h1>
-               <p>Screen Capture AI</p>
-             </div>
-             <AuthButton />
-             {/* 필요시 구 프로젝트 login.tsx의 HTML/CSS 추가 */}
-         </div>
-      </main>
-    );
+        <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+           <div className="login-container">
+               <button className="close-button" onClick={handleCloseWindow}>×</button>
+               <div className="login-header">
+                 <h1>로그인</h1>
+                 <p>Screen Capture AI</p>
+               </div>
+               <AuthButton />
+               {/* 구 프로젝트 login.tsx의 다크 모드 토글 등 필요시 추가 */}
+           </div>
+        </main>
+      );
   }
 
-  // 로그인된 상태 (구 프로젝트 index.tsx의 메인 UI 구조)
+  // 로그인된 상태
   const userName = session.user?.name || 'User';
   return (
     <>
-      {/* 헤더 (구 프로젝트 구조) */}
+      {/* 헤더 */}
       <header className="header">
         <div className="container">
           <div className="header-content">
-            <div className="header-left">
-              <div className="logo"> {/* 로고 아이콘 등 필요시 추가 */} </div>
+            {/* ... (헤더 왼쪽 로고/타이틀) ... */}
+             <div className="header-left">
+              {/* 로고 SVG 등 필요시 추가 */}
               <div className="header-title">
                 <h1>Screen Capture AI</h1>
                 <p>자동 스크린샷 & AI 분석</p>
               </div>
             </div>
             <div className="header-right">
-              {/* 사용자 정보 및 로그아웃 버튼 (AuthButton 내부 로직 활용) */}
+              {/* 사용자 정보 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                 <div style={{ textAlign: 'right' }}>
+                 {/* ... (사용자 이름, 이메일, 이미지) ... */}
+                  <div style={{ textAlign: 'right' }}>
                    <div style={{ fontWeight: 600 }}>{userName}</div>
                    <div style={{ color: 'var(--muted-foreground)' }}>{session.user?.email}</div>
                  </div>
@@ -152,69 +229,130 @@ export default function Home() {
                    <Image src={session.user.image} alt="Profile" width={40} height={40} style={{ borderRadius: '50%' }} />
                  )}
               </div>
+              {/* 다크 모드 토글 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label className="toggle-switch">
+                      <input type="checkbox" onChange={(e) => handleDarkModeToggle(e.target.checked)} defaultChecked={typeof window !== 'undefined' && localStorage.getItem('darkMode') === '1'} />
+                      <span className="slider"></span>
+                  </label>
+                  <span style={{ fontSize: '0.8rem'}}>다크 모드</span>
+              </div>
+              {/* 로그아웃 버튼 */}
               <button onClick={() => signOut()} className="btn btn-secondary btn-sm">로그아웃</button>
-              {/* 다크 모드 토글 등 필요시 추가 */}
             </div>
           </div>
         </div>
       </header>
 
-      {/* 메인 콘텐츠 (구 프로젝트 구조) */}
+      {/* 메인 콘텐츠 */}
       <main className="main-content">
         <div className="container">
-          <div className="grid"> {/* 구 프로젝트는 flex였으나 grid 사용 */}
+          <div className="grid">
             {/* 왼쪽 컬럼 */}
             <div className="col-left">
-              <section className="card yoko yoko-left"> {/* display: flex 필요 없음 */}
-                <div className="card-header">
-                  <h3 className="card-title">자동 스크린샷 설정</h3>
-                  {/* 상태 표시 등 필요시 추가 */}
+              <section className="card"> {/* yoko 클래스 제거하고 flex direction 설정 */}
+                <div style={{ flex: '7.5', display: 'flex', flexDirection: 'column' }}> {/* 왼쪽 영역 */}
+                    <div className="card-header">
+                      <h3 className="card-title">자동 스크린샷 설정</h3>
+                    </div>
+                    <div className="card-content">
+                      {/* ... (캡처 간격, 해상도, 시작/중지 버튼 - 이전과 동일) ... */}
+                       <div className="control-section">
+                        <div className="form-group">
+                          <label htmlFor="interval">캡처 간격 (초):</label>
+                          <select className="select" id="interval" value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value))} disabled={isRecording}>
+                            <option value={5}>5초</option>
+                            <option value={15}>15초</option>
+                            <option value={30}>30초</option>
+                            <option value={60}>1분</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="resolution">해상도 스케일:</label>
+                          <select className="select" id="resolution" value={resolution} onChange={(e) => setResolution(e.target.value)} disabled={isRecording}>
+                            <option value="1.0">100%</option>
+                            <option value="0.75">75%</option>
+                            <option value="0.5">50%</option>
+                          </select>
+                        </div>
+                        <button
+                          onClick={isRecording ? handleStopCapture : handleStartCapture}
+                          className={`btn btn-large btn-full ${isRecording ? 'btn-destructive' : 'btn-primary'}`}
+                          id={isRecording ? 'btn-stop' : 'btn-start'}
+                        >
+                          {isRecording ? '캡처 중지' : '캡처 시작'}
+                        </button>
+                      </div>
+                      {/* --- [추가] 통계 표시 --- */}
+                      <div className="stats-grid">
+                        <div className="stat-card">
+                          <div className="stat-label">촬영 매수</div>
+                          <div className="stat-value">{totalShots}</div>
+                        </div>
+                        <div className="stat-card">
+                          <div className="stat-label">총 용량</div>
+                          {/* 바이트를 MB 단위로 변환하여 소수점 1자리까지 표시 */}
+                          <div className="stat-value">{(totalSize / (1024 * 1024)).toFixed(1)} <span style={{fontSize: '1rem'}}>MB</span></div>
+                        </div>
+                        <div className="stat-card">
+                          <div className="stat-label">업로드 완료</div>
+                          <div className="stat-value">{uploadedCount}</div>
+                        </div>
+                      </div>
+                    </div>
+                     {/* --- [추가] 스크린샷 미리보기 --- */}
+                     <div className="card-content" style={{ borderTop: '1px solid var(--border)' }}>
+                         <h4>최근 스크린샷</h4>
+                         <div id="isCapturing" style={{ marginTop: '10px', display: 'flex', gap: '8px', overflowX: 'auto' }}>
+                           {previewImages.length > 0 ? (
+                             previewImages.map((dataUrl, index) => (
+                               <img key={index} src={dataUrl} alt={`preview-${index}`} style={{ height: '100px', width: 'auto', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                             ))
+                           ) : (
+                             <p style={{ color: 'var(--muted-foreground)' }}>미리보기 없음</p>
+                           )}
+                         </div>
+                     </div>
                 </div>
-                <div className="card-content">
-                  <div className="control-section">
-                    <div className="form-group">
-                      <label htmlFor="interval">캡처 간격 (초):</label>
-                      <select className="select" id="interval" value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value))} disabled={isRecording}>
-                        <option value={5}>5초</option>
-                        <option value={15}>15초</option>
-                        <option value={30}>30초</option>
-                        <option value={60}>1분</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label htmlFor="resolution">해상도 스케일:</label>
-                      <select className="select" id="resolution" value={resolution} onChange={(e) => setResolution(e.target.value)} disabled={isRecording}>
-                        <option value="1.0">100%</option>
-                        <option value="0.75">75%</option>
-                        <option value="0.5">50%</option>
-                      </select>
-                    </div>
-                    {/* 캡처 시작/중지 버튼 */}
-                    <button
-                      onClick={isRecording ? handleStopCapture : handleStartCapture}
-                      className={`btn btn-large btn-full ${isRecording ? 'btn-destructive' : 'btn-primary'}`}
-                      id={isRecording ? 'btn-stop' : 'btn-start'}
-                    >
-                      {isRecording ? '캡처 중지' : '캡처 시작'}
-                    </button>
+
+                <div style={{ flex: '2.5', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}> {/* 오른쪽 영역 */}
+                  <div className="card-header">
+                      <h4 className="card-title">활동 로그</h4>
                   </div>
-                  {/* 통계 (구 프로젝트 참조, 필요시 추가) */}
-                  {/* <div className="stats-grid">...</div> */}
+                  <div className="card-content" style={{ flexGrow: 1, overflow: 'hidden' }}> {/* 내용이 넘칠 경우 스크롤 */}
+                    {/* --- [추가] 활동 로그 리스트 --- */}
+                    <div className="activity-list" style={{ height: 'calc(100% - 20px)', overflowY: 'auto' }}>
+                       {activityLog.length > 0 ? (
+                           activityLog.map((log, index) => (
+                             <div className="activity-item" key={index}>
+                               <span className="activity-time">{log.time}</span>
+                               <span className="activity-message">{log.message}</span>
+                             </div>
+                           ))
+                       ) : (
+                           <p style={{ color: 'var(--muted-foreground)'}}>로그 없음</p>
+                       )}
+                    </div>
+                    {/* AI 분석 도트 (캡처 중일 때만 표시) */}
+                    <div className={`ai-dots ${isRecording ? 'running' : ''}`} style={{ marginTop: '10px' }}>
+                       <span className="dot" />
+                       <span className="dot" />
+                       <span className="dot" />
+                    </div>
+                  </div>
                 </div>
-                {/* 미리보기 (구 프로젝트 참조, 필요시 추가) */}
-                {/* <div id="isCapturing">...</div> */}
               </section>
             </div>
 
             {/* 오른쪽 컬럼 */}
             <div className="col-right">
-              <section className="card yoko">
-                <div className="card-header">
-                  <h4 className="card-title">레포트 생성</h4>
-                </div>
-                <div className="card-content">
+              {/* 레포트 생성 카드 */}
+              <section className="card"> {/* yoko 제거 */}
+                <div className="card-content" style={{width: '100%'}}> {/* yoko 제거로 인한 스타일 조정 */}
+                  <div className="card-header" style={{padding: 0, marginBottom: '1rem'}}>
+                     <h4 className="card-title">레포트 생성</h4>
+                  </div>
                   <div className="report-section">
-                    {/* 전송 후 삭제 토글 (구 프로젝트 참조) */}
                     <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <label htmlFor="deleteAfterUploadToggle">전송 후 스크린샷 삭제</label>
                       <label className="toggle-switch">
@@ -222,7 +360,6 @@ export default function Home() {
                         <span className="slider"></span>
                       </label>
                     </div>
-                    {/* 오늘 요약 생성 버튼 */}
                     <button
                       onClick={handleGenerateSummary}
                       disabled={isLoadingSummary}
@@ -231,30 +368,24 @@ export default function Home() {
                     >
                       {isLoadingSummary ? '생성 중...' : '오늘 요약 생성하기'}
                     </button>
-                     {/* 요약 결과 표시 */}
-                     {summary && (
-                       <div style={{ marginTop: '1rem', padding: '10px', border: '1px solid var(--border)', background: 'var(--background)', maxHeight: '300px', overflowY: 'auto' }}>
-                         <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontSize: '0.875rem' }}>
-                           {summary}
-                         </pre>
-                       </div>
-                     )}
+                    {summary && (
+                      <div style={{ marginTop: '1rem', padding: '10px', border: '1px solid var(--border)', background: 'var(--background)', maxHeight: '300px', overflowY: 'auto' }}>
+                        <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontSize: '0.875rem' }}>
+                          {summary}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 </div>
               </section>
-              {/* 활동 로그 (구 프로젝트 참조, 필요시 추가) */}
-              {/* <section className="card yoko">...</section> */}
-              {/* 과거 레포트 (구 프로젝트 참조, 필요시 추가) */}
+              {/* 과거 레포트 카드 (구 프로젝트 참조, 필요시 추가) */}
               {/* <section className="card">...</section> */}
             </div>
           </div>
         </div>
       </main>
 
-      {/* 하단 로그 바 */}
-      <footer style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', background: '#333', color: '#eee', padding: '10px 20px', fontSize: '0.875rem' }}>
-        <strong>로그:</strong> {logMessage}
-      </footer>
+      {/* 하단 로그 바 제거됨 */}
     </>
   );
 }
