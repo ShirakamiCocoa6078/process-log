@@ -1,7 +1,7 @@
 // src/types/next-auth.d.ts
 
-import { DefaultSession, DefaultUser } from 'next-auth';
-import { JWT, DefaultJWT } from 'next-auth/jwt';
+import { DefaultSession } from 'next-auth';
+import { DefaultJWT } from 'next-auth/jwt';
 
 // JWT 토큰에 id와 role을 포함하도록 확장
 declare module 'next-auth/jwt' {

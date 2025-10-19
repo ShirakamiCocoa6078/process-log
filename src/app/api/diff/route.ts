@@ -12,9 +12,6 @@ import path from 'path';
 // ----------------------------------------------------------------
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 // AI 비교 프롬프트
 const promptFilePath = path.join(
@@ -93,6 +90,9 @@ interface ScreenshotPayload {
  * 두 개의 이미지를 OpenAI에 보내 비교 분석을 요청
  */
 async function analyzeImages(imgA: ScreenshotPayload, imgB: ScreenshotPayload) {
+    const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
   const response = await openai.chat.completions.create({
     model: 'gpt-4o', // 1단계에서 논의된 모델
     response_format: { type: 'json_object' }, // JSON 출력 강제
@@ -121,6 +121,10 @@ async function analyzeImages(imgA: ScreenshotPayload, imgB: ScreenshotPayload) {
   });
   
   const jsonResult = response.choices[0].message.content;
+
+  if(!jsonResult) {
+    throw new Error('OpenAi return empty response');
+  }
   return JSON.parse(jsonResult); // JSON 객체 반환
 }
 
@@ -187,10 +191,11 @@ export async function POST(request: NextRequest) {
         userId_taskDateId: { userId, taskDateId }
       },
     });
-
-    let newJsonData: any = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let newJsonData: Record<string, any> = {}; 
     if (existingLog && existingLog.taskTempTxt && typeof existingLog.taskTempTxt === 'object') {
-      newJsonData = existingLog.taskTempTxt;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    newJsonData = existingLog.taskTempTxt as Record<string, any>;
     }
     
     // 5-2. 새 분석 결과를 타임스탬프 키로 추가 (덮어쓰기/추가)
