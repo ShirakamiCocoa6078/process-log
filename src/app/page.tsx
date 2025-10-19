@@ -70,16 +70,6 @@ export default function Home() {
 
   // --- 활동 로그 상태 ---
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
-
-  // --- [추가] 과거 요약 상태 ---
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    // 기본값: 오늘 날짜 (YYYY-MM-DD 형식)
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
-  const [pastSummary, setPastSummary] = useState<string | null>(null);
-  const [isLoadingPastSummary, setIsLoadingPastSummary] = useState<boolean>(false);
-
   // --- 로그 추가 함수 ---
   const addLog = useCallback((message: string) => {
     // 메시지에서 타임스탬프 제거 시도 (중복 방지)
@@ -246,13 +236,6 @@ export default function Home() {
     };
   }, [addLog]); // addLog가 useCallback으로 감싸져 있어 한번만 실행됨
 
-  // --- [추가] useEffect: 컴포넌트 마운트 시 오늘 날짜의 요약 미리 로드 ---
-  useEffect(() => {
-      if(session && settingsLoaded) { // 로그인 및 설정 로드 완료 후 실행
-          handleFetchPastSummary(selectedDate); // 초기 selectedDate (오늘) 로드
-      }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, settingsLoaded]); // handleFetchPastSummary는 useCallback으로 감싸져 불필요
 
   // --- 핸들러 함수들 ---
   const handleStartCapture = async () => {
@@ -331,38 +314,6 @@ export default function Home() {
   const handleDarkModeToggle = (isChecked: boolean) => {
     document.body.classList.toggle('dark', isChecked);
     try { localStorage.setItem('darkMode', isChecked ? '1' : '0'); } catch {}
-  };
-
-  // --- [추가] 과거 요약 조회 핸들러 ---
-  const handleFetchPastSummary = useCallback(async (dateToFetch: string) => {
-    if (!dateToFetch) return;
-    setIsLoadingPastSummary(true);
-    setPastSummary(null); // 이전 결과 초기화
-    addLog(`${dateToFetch} 요약 조회 중...`);
-
-    try {
-      const response = await fetch(`/api/summary/${dateToFetch}`); // GET 요청
-      const data = await response.json();
-
-      if (response.ok && data.status === 'success') {
-        setPastSummary(data.summary); // null 또는 Markdown 저장
-        addLog(`${dateToFetch}: ${data.message || (data.summary ? '요약 로드 완료.' : '요약 없음.')}`);
-      } else {
-        addLog(`과거 요약 조회 실패 (${dateToFetch}): ${data.message}`);
-      }
-    } catch (error) {
-      addLog(`과거 요약 API 호출 오류 (${dateToFetch}): ${(error as Error).message}`);
-    } finally {
-      setIsLoadingPastSummary(false);
-    }
-  }, [addLog]); // addLog 의존성 추가
-
-  // --- [추가] 날짜 선택 변경 핸들러 ---
-  const handleDateChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const newDate = event.target.value;
-    setSelectedDate(newDate);
-    // 날짜가 변경되면 해당 날짜의 요약을 자동으로 조회
-    handleFetchPastSummary(newDate);
   };
 
   // --- [추가] 자동 요약 토글 핸들러 ---
@@ -640,40 +591,6 @@ export default function Home() {
                           {summary}
                         </pre>
                       </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-              
-              {/* 👇 [수정] 과거 요약 카드 */}
-              <section className="card">
-                <div className="card-header">
-                  <h4 className="card-title">과거 요약 조회</h4>
-                </div>
-                <div className="card-content">
-                  {/* 날짜 선택 input */}
-                  <div className="form-group">
-                    <label htmlFor="summaryDate">날짜 선택:</label>
-                    <input
-                      type="date"
-                      id="summaryDate"
-                      className="input"
-                      value={selectedDate}
-                      onChange={handleDateChange}
-                      max={new Date().toISOString().split('T')[0]} // 오늘 이후 날짜 선택 불가
-                    />
-                  </div>
-
-                  {/* 요약 결과 표시 */}
-                  <div style={{ marginTop: '1rem', padding: '10px', border: '1px solid var(--border)', background: 'var(--background)', minHeight: '100px', maxHeight: '300px', overflowY: 'auto' }}>
-                    {isLoadingPastSummary ? (
-                      <p style={{ color: 'var(--muted-foreground)' }}>로딩 중...</p>
-                    ) : pastSummary ? (
-                      <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontSize: '0.875rem' }}>
-                        {pastSummary}
-                      </pre>
-                    ) : (
-                      <p style={{ color: 'var(--muted-foreground)' }}>선택한 날짜의 요약이 없습니다.</p>
                     )}
                   </div>
                 </div>
