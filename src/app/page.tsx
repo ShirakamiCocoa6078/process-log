@@ -54,26 +54,34 @@ export default function Home() {
   const [summary, setSummary] = useState('');
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false); // 설정 로드 완료 여부
+  const [autoSummaryEnabled, setAutoSummaryEnabled] = useState<boolean>(false); // 👈 [추가] 자동 요약 상태
 
-  // --- [추가] 통계 상태 ---
+  // --- 통계 상태 ---
   const [totalShots, setTotalShots] = useState<number>(0);
   const [totalSize, setTotalSize] = useState<number>(0);
   const [uploadedCount, setUploadedCount] = useState<number>(0);
 
-  // --- [추가] 미리보기 상태 ---
+  // --- 미리보기 상태 ---
   const [previewImages, setPreviewImages] = useState<string[]>([]);
 
-  // --- [추가] 활동 로그 상태 ---
+  // --- 활동 로그 상태 ---
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
 
   // --- 로그 추가 함수 ---
   const addLog = useCallback((message: string) => {
-    // 메시지에서 타임스탬프 제거 (index.ts에서 이미 추가함)
+    // 메시지에서 타임스탬프 제거 시도 (중복 방지)
     const cleanMessage = message.replace(/^\[\d{2}:\d{2}:\d{2}\]\s*/, '');
     const timeMatch = message.match(/^\[(\d{2}:\d{2}:\d{2})\]/);
-    const time = timeMatch ? timeMatch[1] : new Date().toLocaleTimeString();
+    // 메인 프로세스 타임스탬프가 있으면 사용, 없으면 현재 시간 사용
+    const time = timeMatch ? timeMatch[1] : new Date().toLocaleTimeString('en-GB'); // HH:MM:SS 형식
 
-    setActivityLog((prev) => [{ time, message: cleanMessage }, ...prev].slice(0, 100)); // 최근 100개 로그만 유지
+    // 중복 로그 방지 (선택 사항)
+    setActivityLog((prev) => {
+        if (prev.length > 0 && prev[0].message === cleanMessage && prev[0].time === time) {
+            return prev; // 마지막 로그와 동일하면 추가 안 함
+        }
+        return [{ time, message: cleanMessage }, ...prev].slice(0, 100);
+    });
   }, []);
 
   // --- useEffect: 설정 로드 (마운트 시 1회) ---
@@ -85,44 +93,59 @@ export default function Home() {
           setIntervalSec(settings.interval ?? 5);
           setResolution(String(settings.resolution ?? '1.0'));
           setDeleteAfterUpload(settings.deleteAfterUpload ?? false);
-          addLog('저장된 설정을 불러왔습니다.');
+          addLog('로컬 설정을 불러왔습니다.');
         } catch (error) {
-          addLog(`설정 로드 오류: ${(error as Error).message}`);
-        } finally {
-          setSettingsLoaded(true); // 로드 완료 표시
+          addLog(`로컬 설정 로드 오류: ${(error as Error).message}`);
         }
-      } else {
-        setSettingsLoaded(true); // Electron API 없으면 바로 완료 처리
       }
+      // 자동 요약 설정 로드 (로그인 후)
+      if (session) {
+          try {
+            const response = await fetch('/api/user/settings'); // GET 요청
+            if (response.ok) {
+              const data = await response.json();
+              if (data.status === 'success') {
+                setAutoSummaryEnabled(data.autoSummaryEnabled);
+                addLog('자동 요약 설정을 서버에서 불러왔습니다.');
+              } else {
+                 addLog(`자동 요약 설정 로드 실패: ${data.message}`);
+              }
+            } else {
+                 addLog(`자동 요약 설정 로드 실패 (HTTP ${response.status}): ${response.statusText}`);
+            }
+          } catch (error) {
+            addLog(`자동 요약 설정 API 호출 오류: ${(error as Error).message}`);
+          }
+      }
+      setSettingsLoaded(true); // 모든 설정 로드 시도 완료
     };
     loadSettings();
-  }, [addLog]); // addLog가 useCallback으로 감싸져 있어 한번만 실행됨
+  }, [session, addLog]); // session 상태가 변경될 때마다 자동 요약 설정 다시 로드
 
   // --- useEffect: 설정 자동 저장 ---
   useEffect(() => {
-    if (!settingsLoaded) return; // 설정이 로드된 후에만 저장 시작
+    if (!settingsLoaded) return;
 
     const saveSettings = async () => {
       if (window.electronAPI?.writeSettings) {
         try {
           await window.electronAPI.writeSettings({
             interval: intervalSec,
-            resolution: parseFloat(resolution), // 숫자로 변환하여 저장
+            resolution: parseFloat(resolution),
             deleteAfterUpload: deleteAfterUpload,
           });
-          // addLog('설정이 자동 저장되었습니다.'); // 너무 자주 로깅되므로 주석 처리
         } catch (error) {
-          addLog(`설정 저장 오류: ${(error as Error).message}`);
+          addLog(`로컬 설정 저장 오류: ${(error as Error).message}`);
         }
       }
     };
-    // 디바운스: 마지막 변경 후 500ms 뒤에 저장
     const timer = setTimeout(saveSettings, 500);
     return () => clearTimeout(timer);
   }, [intervalSec, resolution, deleteAfterUpload, settingsLoaded, addLog]);
 
   // --- useEffect: 통계 및 미리보기 주기적 업데이트 ---
   useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
     const fetchStatsAndPreviews = async () => {
       if (window.electronAPI?.getStats) {
         try {
@@ -130,13 +153,14 @@ export default function Home() {
           setTotalShots(stats.totalShots);
           setTotalSize(stats.totalSize);
           setUploadedCount(stats.uploadedCount);
+          // 대기 파일 수는 통계 업데이트 시 같이 반영됨
         } catch (error) {
           addLog(`통계 업데이트 오류: ${(error as Error).message}`);
         }
       }
       if (window.electronAPI?.listScreenshots) {
         try {
-          const previews = await window.electronAPI.listScreenshots(4); // 최근 4개
+          const previews = await window.electronAPI.listScreenshots(4);
           setPreviewImages(previews);
         } catch (error) {
           addLog(`미리보기 업데이트 오류: ${(error as Error).message}`);
@@ -144,74 +168,78 @@ export default function Home() {
       }
     };
 
-    fetchStatsAndPreviews(); // 즉시 한번 실행
-    const intervalId = setInterval(fetchStatsAndPreviews, 5000); // 5초마다 업데이트
+    if(session){ // 로그인 상태일 때만 주기적 업데이트 실행
+        fetchStatsAndPreviews(); // 즉시 한번 실행
+        intervalId = setInterval(fetchStatsAndPreviews, 5000); // 5초마다 업데이트
+    }
 
-    return () => clearInterval(intervalId); // 컴포넌트 언마운트 시 인터벌 제거
-  }, [addLog]);
+    return () => { // 컴포넌트 언마운트 또는 로그아웃 시 인터벌 제거
+        if(intervalId) clearInterval(intervalId);
+    };
+  }, [session, addLog]); // session 상태가 변경될 때 인터벌 시작/중지
 
   // --- useEffect: Main 프로세스 로그 리스너 ---
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
     if (window.electronAPI?.onLogMessage) {
-      const unsubscribe = window.electronAPI.onLogMessage((message) => {
-        addLog(message); // 받은 로그를 상태에 추가
+      unsubscribe = window.electronAPI.onLogMessage((message) => {
+        addLog(message);
       });
-      // 클린업 함수: 컴포넌트 언마운트 시 리스너 제거
-      return () => unsubscribe();
     }
+    return () => { // 클린업 함수
+        if (unsubscribe) unsubscribe();
+    };
   }, [addLog]); // addLog가 useCallback으로 감싸져 있어 한번만 실행됨
 
   // --- 핸들러 함수들 ---
   const handleStartCapture = async () => {
-    console.log('캡처 시작 버튼 클릭됨!'); // 디버깅 로그
+    console.log('캡처 시작 버튼 클릭됨!');
     if (!window.electronAPI) {
       addLog('Electron API를 찾을 수 없습니다.');
       return;
     }
     addLog('캡처 시작 요청 중...');
     const settings = { interval: intervalSec, resolution: parseFloat(resolution) };
-    try { // [추가] try...catch 블록
+    try {
       const result = await window.electronAPI.startCapture(settings);
       if (result.success) {
         setIsRecording(true);
-        addLog('캡처 시작됨.'); // addLog 사용
+        addLog('캡처 시작됨.');
       } else {
-        addLog(`캡처 시작 실패: ${result.message}`); // addLog 사용
+        addLog(`캡처 시작 실패: ${result.message}`);
       }
     } catch (error) {
-       addLog(`[IPC 오류] 캡처 시작: ${(error as Error).message}`); // addLog 사용
+       addLog(`[IPC 오류] 캡처 시작: ${(error as Error).message}`);
        console.error('[IPC Error] Start Capture:', error);
     }
   };
 
-  // 캡처 중지 핸들러
   const handleStopCapture = async () => {
-    console.log('캡처 중지 버튼 클릭됨!'); // 디버깅 로그
+    console.log('캡처 중지 버튼 클릭됨!');
     if (!window.electronAPI) {
         addLog('Electron API를 찾을 수 없습니다.');
         return;
     };
-    addLog('캡처 중지 요청 중...'); // addLog 사용
-     try { // [추가] try...catch 블록
+    addLog('캡처 중지 요청 중...');
+     try {
         const result = await window.electronAPI.stopCapture();
         if (result.success) {
           setIsRecording(false);
-          addLog('캡처 중지됨.'); // addLog 사용
+          addLog('캡처 중지됨.');
         } else {
-          addLog(`캡처 중지 실패: ${result.message}`); // addLog 사용
+          addLog(`캡처 중지 실패: ${result.message}`);
         }
     } catch (error) {
-        addLog(`[IPC 오류] 캡처 중지: ${(error as Error).message}`); // addLog 사용
+        addLog(`[IPC 오류] 캡처 중지: ${(error as Error).message}`);
         console.error('[IPC Error] Stop Capture:', error);
     }
   };
 
-  // 오늘 요약 생성 핸들러 (5단계 로직 유지)
   const handleGenerateSummary = async () => {
-    console.log('요약 생성 버튼 클릭됨!'); // 디버깅 로그
+    console.log('요약 생성 버튼 클릭됨!');
     setIsLoadingSummary(true);
     setSummary('');
-    addLog('오늘 활동 요약을 생성 중입니다...'); // addLog 사용
+    addLog('오늘 활동 요약을 생성 중입니다...');
 
     try {
       const response = await fetch('/api/summary', {
@@ -221,27 +249,48 @@ export default function Home() {
 
       if (response.ok && data.status === 'success') {
         setSummary(data.summary);
-        addLog('요약 생성 완료.'); // addLog 사용
+        // data.message가 있으면 로그에 추가 (예: 캐시된 요약 반환 메시지)
+        addLog(data.message || '요약 생성 완료.');
       } else {
-        addLog(`요약 생성 실패: ${data.message}`); // addLog 사용
+        addLog(`요약 생성 실패: ${data.message}`);
       }
     } catch (error) {
-      addLog(`API 호출 오류: ${(error as Error).message}`); // addLog 사용
+      addLog(`API 호출 오류: ${(error as Error).message}`);
       console.error('[API Error] Summary:', error);
     }
     setIsLoadingSummary(false);
   };
 
-  // [추가] 창 닫기 핸들러
   const handleCloseWindow = () => {
     window.electronAPI?.closeWindow();
   };
 
-  // [추가] 다크 모드 핸들러
   const handleDarkModeToggle = (isChecked: boolean) => {
     document.body.classList.toggle('dark', isChecked);
-    // (선택) 로컬 스토리지 등에 상태 저장
     try { localStorage.setItem('darkMode', isChecked ? '1' : '0'); } catch {}
+  };
+
+  // --- [추가] 자동 요약 토글 핸들러 ---
+  const handleAutoSummaryToggle = async (isChecked: boolean) => {
+    setAutoSummaryEnabled(isChecked);
+    addLog(`자동 요약 설정을 ${isChecked ? '활성화' : '비활성화'}하는 중...`);
+    try {
+      const response = await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoSummaryEnabled: isChecked }),
+      });
+      const data = await response.json();
+      if (response.ok && data.status === 'success') {
+        addLog('자동 요약 설정이 저장되었습니다.');
+      } else {
+        addLog(`자동 요약 설정 저장 실패: ${data.message}`);
+        setAutoSummaryEnabled(!isChecked); // 실패 시 UI 원복
+      }
+    } catch (error) {
+      addLog(`자동 요약 설정 API 호출 오류: ${(error as Error).message}`);
+      setAutoSummaryEnabled(!isChecked); // 실패 시 UI 원복
+    }
   };
 
   // --- 렌더링 ---
@@ -251,7 +300,6 @@ export default function Home() {
 
   // 로그인되지 않은 상태
   if (!session) {
-    // ... (이전과 동일한 로그인 UI)
     return (
         <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
            <div className="login-container">
@@ -261,7 +309,7 @@ export default function Home() {
                  <p>Screen Capture AI</p>
                </div>
                <AuthButton />
-               {/* 구 프로젝트 login.tsx의 다크 모드 토글 등 필요시 추가 */}
+               {/* 다크 모드 토글 (로그인 화면에도 추가 가능) */}
            </div>
         </main>
       );
@@ -275,18 +323,14 @@ export default function Home() {
       <header className="header">
         <div className="container">
           <div className="header-content">
-            {/* ... (헤더 왼쪽 로고/타이틀) ... */}
              <div className="header-left">
-              {/* 로고 SVG 등 필요시 추가 */}
               <div className="header-title">
                 <h1>Screen Capture AI</h1>
                 <p>자동 스크린샷 & AI 분석</p>
               </div>
             </div>
             <div className="header-right">
-              {/* 사용자 정보 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                 {/* ... (사용자 이름, 이메일, 이미지) ... */}
                   <div style={{ textAlign: 'right' }}>
                    <div style={{ fontWeight: 600 }}>{userName}</div>
                    <div style={{ color: 'var(--muted-foreground)' }}>{session.user?.email}</div>
@@ -295,7 +339,6 @@ export default function Home() {
                    <Image src={session.user.image} alt="Profile" width={40} height={40} style={{ borderRadius: '50%' }} />
                  )}
               </div>
-              {/* 다크 모드 토글 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <label className="toggle-switch">
                       <input type="checkbox" onChange={(e) => handleDarkModeToggle(e.target.checked)} defaultChecked={typeof window !== 'undefined' && localStorage.getItem('darkMode') === '1'} />
@@ -303,7 +346,6 @@ export default function Home() {
                   </label>
                   <span style={{ fontSize: '0.8rem'}}>다크 모드</span>
               </div>
-              {/* 로그아웃 버튼 */}
               <button onClick={() => signOut()} className="btn btn-secondary btn-sm">로그아웃</button>
             </div>
           </div>
@@ -316,13 +358,12 @@ export default function Home() {
           <div className="grid">
             {/* 왼쪽 컬럼 */}
             <div className="col-left">
-              <section className="card"> {/* yoko 클래스 제거하고 flex direction 설정 */}
-                <div style={{ flex: '7.5', display: 'flex', flexDirection: 'column' }}> {/* 왼쪽 영역 */}
+              <section className="card">
+                <div style={{ flex: '7.5', display: 'flex', flexDirection: 'column' }}>
                     <div className="card-header">
                       <h3 className="card-title">자동 스크린샷 설정</h3>
                     </div>
                     <div className="card-content">
-                      {/* ... (캡처 간격, 해상도, 시작/중지 버튼 - 이전과 동일) ... */}
                        <div className="control-section">
                         <div className="form-group">
                           <label htmlFor="interval">캡처 간격 (초):</label>
@@ -349,7 +390,6 @@ export default function Home() {
                           {isRecording ? '캡처 중지' : '캡처 시작'}
                         </button>
                       </div>
-                      {/* --- [추가] 통계 표시 --- */}
                       <div className="stats-grid">
                         <div className="stat-card">
                           <div className="stat-label">촬영 매수</div>
@@ -357,7 +397,6 @@ export default function Home() {
                         </div>
                         <div className="stat-card">
                           <div className="stat-label">총 용량</div>
-                          {/* 바이트를 MB 단위로 변환하여 소수점 1자리까지 표시 */}
                           <div className="stat-value">{(totalSize / (1024 * 1024)).toFixed(1)} <span style={{fontSize: '1rem'}}>MB</span></div>
                         </div>
                         <div className="stat-card">
@@ -366,27 +405,29 @@ export default function Home() {
                         </div>
                       </div>
                     </div>
-                     {/* --- [추가] 스크린샷 미리보기 --- */}
                      <div className="card-content" style={{ borderTop: '1px solid var(--border)' }}>
-                         <h4>최근 스크린샷</h4>
-                         <div id="isCapturing" style={{ marginTop: '10px', display: 'flex', gap: '8px', overflowX: 'auto' }}>
+                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                             {/* 대기 파일 수 표시는 totalShots를 사용 */}
+                             <h4>최근 스크린샷 (대기: {totalShots}개)</h4>
+                              {/* 업로드 큐 확인 버튼은 제거 (자동 업데이트 되므로) */}
+                         </div>
+                         <div id="isCapturing" style={{ display: 'flex', gap: '8px', overflowX: 'auto', minHeight: '100px', alignItems: 'center' }}>
                            {previewImages.length > 0 ? (
                              previewImages.map((dataUrl, index) => (
                                <img key={index} src={dataUrl} alt={`preview-${index}`} style={{ height: '100px', width: 'auto', borderRadius: '4px', border: '1px solid var(--border)' }} />
                              ))
                            ) : (
-                             <p style={{ color: 'var(--muted-foreground)' }}>미리보기 없음</p>
+                             <p style={{ color: 'var(--muted-foreground)' }}>{isRecording ? '캡처 진행 중...' : '미리보기 없음'}</p>
                            )}
                          </div>
                      </div>
                 </div>
 
-                <div style={{ flex: '2.5', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}> {/* 오른쪽 영역 */}
+                <div style={{ flex: '2.5', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
                   <div className="card-header">
                       <h4 className="card-title">활동 로그</h4>
                   </div>
-                  <div className="card-content" style={{ flexGrow: 1, overflow: 'hidden' }}> {/* 내용이 넘칠 경우 스크롤 */}
-                    {/* --- [추가] 활동 로그 리스트 --- */}
+                  <div className="card-content" style={{ flexGrow: 1, overflow: 'hidden' }}>
                     <div className="activity-list" style={{ height: 'calc(100% - 20px)', overflowY: 'auto' }}>
                        {activityLog.length > 0 ? (
                            activityLog.map((log, index) => (
@@ -399,7 +440,6 @@ export default function Home() {
                            <p style={{ color: 'var(--muted-foreground)'}}>로그 없음</p>
                        )}
                     </div>
-                    {/* AI 분석 도트 (캡처 중일 때만 표시) */}
                     <div className={`ai-dots ${isRecording ? 'running' : ''}`} style={{ marginTop: '10px' }}>
                        <span className="dot" />
                        <span className="dot" />
@@ -412,20 +452,28 @@ export default function Home() {
 
             {/* 오른쪽 컬럼 */}
             <div className="col-right">
-              {/* 레포트 생성 카드 */}
-              <section className="card"> {/* yoko 제거 */}
-                <div className="card-content" style={{width: '100%'}}> {/* yoko 제거로 인한 스타일 조정 */}
+              <section className="card">
+                <div className="card-content" style={{width: '100%'}}>
                   <div className="card-header" style={{padding: 0, marginBottom: '1rem'}}>
-                     <h4 className="card-title">레포트 생성</h4>
+                     <h4 className="card-title">기능 설정</h4>
                   </div>
                   <div className="report-section">
-                    <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ marginBottom: 15, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <label htmlFor="deleteAfterUploadToggle">전송 후 스크린샷 삭제</label>
                       <label className="toggle-switch">
                         <input type="checkbox" id="deleteAfterUploadToggle" checked={deleteAfterUpload} onChange={(e) => setDeleteAfterUpload(e.target.checked)} />
                         <span className="slider"></span>
                       </label>
                     </div>
+                    {/* 👇 [추가] 자동 일일 요약 토글 */}
+                    <div style={{ marginBottom: 15, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <label htmlFor="autoSummaryToggle">매일 자정에 자동 요약 생성</label>
+                      <label className="toggle-switch">
+                        <input type="checkbox" id="autoSummaryToggle" checked={autoSummaryEnabled} onChange={(e) => handleAutoSummaryToggle(e.target.checked)} />
+                        <span className="slider"></span>
+                      </label>
+                    </div>
+                    {/* 오늘 요약 생성 버튼 */}
                     <button
                       onClick={handleGenerateSummary}
                       disabled={isLoadingSummary}
@@ -444,8 +492,13 @@ export default function Home() {
                   </div>
                 </div>
               </section>
-              {/* 과거 레포트 카드 (구 프로젝트 참조, 필요시 추가) */}
-              {/* <section className="card">...</section> */}
+              {/* 과거 레포트 카드 (향후 구현) */}
+              <section className="card">
+                <div className="card-header"><h4 className="card-title">과거 요약</h4></div>
+                <div className="card-content">
+                  <p style={{ color: 'var(--muted-foreground)'}}>향후 구현될 기능입니다.</p>
+                </div>
+              </section>
             </div>
           </div>
         </div>
