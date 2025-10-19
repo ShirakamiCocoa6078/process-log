@@ -83,11 +83,11 @@ export async function GET(request: NextRequest) {
         const taskData = log.taskTempTxt as Record<string, any>;
         let contentToSummarize = `昨日(${taskDateId.toISOString().split('T')[0]})のアクティビティログデータです...\n\n`;
         const sortedKeys = Object.keys(taskData).sort();
-        for (const timeKey of sortedKeys) {
-            const entry = taskData[timeKey];
-            const dataChunk = { /* ... JSON 조각 생성 ... */ };
-            contentToSummarize += JSON.stringify(dataChunk) + "\n";
-        }
+    for (const timeKey of sortedKeys) {
+      const entry = taskData[timeKey];
+      // entry を文字列化して要約に追加
+      contentToSummarize += JSON.stringify(entry) + "\n";
+    }
 
         // 4-3. AI 要約呼び出し
         const markdownSummary = await requestSummaryFromOpenAI(contentToSummarize);

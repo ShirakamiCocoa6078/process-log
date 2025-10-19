@@ -158,18 +158,9 @@ export async function POST(request: NextRequest) {
 
 【リマインダー】  
 与えられた情報を時系列・文脈・ストーリーとして解釈し、必ずMarkdown記法のみで1つのまとまった活動記録として表現してください。`;
-    const lastEntryTimeKey = taskDataKeys.length > 0 ? taskDataKeys.sort().pop() : null;
-    let lastEntryTimestamp = 0;
-    if(lastEntryTimeKey) {
-        // "HH-MM-SS" 키를 오늘 날짜와 조합하여 Date 객체 생성 (비교용)
-        const timeParts = lastEntryTimeKey.split('-').map(Number);
-        // 주의: Date 객체는 로컬 시간대 기준으로 생성될 수 있으므로, 비교 시 유의
-        const tempDate = new Date(taskDateId); // UTC 자정 복사
-        tempDate.setUTCHours(timeParts[0], timeParts[1], timeParts[2]);
-        lastEntryTimestamp = tempDate.getTime();
-    }
+  const lastEntryTimeKey = taskDataKeys.length > 0 ? taskDataKeys.sort().pop() : null;
     // 시간순 정렬 (키 "HH-MM-SS" 기준)
-    const sortedKeys = Object.keys(taskData).sort();
+  const sortedKeys = Object.keys(taskData).sort();
     
     for (const timeKey of sortedKeys) {
       const entry = taskData[timeKey];

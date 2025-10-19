@@ -3,6 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromAuth } from '@/lib/auth'; // 4段階認証ヘルパー
 
+// DBから返るログエントリの型
+type LogEntry = {
+  taskDateId: Date;
+  taskContent: string | null;
+};
+
 // 日付文字列を UTC Date オブジェクトに変換するヘルパー関数
 function parseUTCDate(dateString: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return null;
@@ -20,9 +26,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'error', message: '認証に失敗しました' }, { status: 401 });
     }
 
-    // 2. 요청 본문 파싱 (시작 날짜, 종료 날짜, 형식)
+    // 2. 요청 본문 파싱 (시작 날짜, 종료 날짜)
     const body = await request.json();
-  const { startDate: startDateStr, endDate: endDateStr, format = 'md' } = body; // デフォルト形式は md
+    const { startDate: startDateStr, endDate: endDateStr } = body;
 
     if (!startDateStr || !endDateStr) {
       return NextResponse.json({ status: 'error', message: '開始日と終了日が必要です。' }, { status: 400 });
@@ -62,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     // 4. Markdown 레포트 내용 생성
   let reportContent = `# 活動レポート (${startDateStr} ~ ${endDateStr})\n\n`;
-    logs.forEach((log: any) => {
+    logs.forEach((log: LogEntry) => {
       // Date 객체를 YYYY-MM-DD 형식으로 변환 (ISOString 활용)
       const dateKey = log.taskDateId.toISOString().split('T')[0];
       reportContent += `## ${dateKey}\n\n`;

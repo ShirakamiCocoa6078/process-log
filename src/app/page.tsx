@@ -3,7 +3,7 @@
 
 import AuthButton from '@/components/AuthButton';
 import { useSession, signOut } from 'next-auth/react';
-import React, { useState, useEffect, useCallback, ChangeEvent } from 'react'; // 👈 ChangeEvent 추가
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 
 // --------------------------------------------------
@@ -460,7 +460,7 @@ export default function Home() {
                          <div id="isCapturing" style={{ display: 'flex', gap: '8px', overflowX: 'auto', minHeight: '100px', alignItems: 'center' }}>
                            {previewImages.length > 0 ? (
                              previewImages.map((dataUrl, index) => (
-                               <img key={index} src={dataUrl} alt={`preview-${index}`} style={{ height: '100px', width: 'auto', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                               <Image key={index} src={dataUrl} alt={`preview-${index}`} width={160} height={100} style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid var(--border)' }} unoptimized />
                              ))
                            ) : (
                              <p style={{ color: 'var(--muted-foreground)' }}>{isRecording ? 'キャプチャ中...' : 'プレビューなし'}</p>
