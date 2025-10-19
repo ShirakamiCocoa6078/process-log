@@ -16,9 +16,9 @@ export const authOptions: AuthOptions = {
     }),
   ],
 
-  // 3. 세션 전략 (JWT 권장)
+  // 3. 세션 전략
   session: {
-    strategy: 'jwt',
+    strategy: 'database',
   },
 
   // 4. 콜백 설정 (★★★★★ 중요 ★★★★★)
