@@ -88,7 +88,7 @@ export default function Home() {
   }, []);
   const handleGenerateReport = async () => {
     setIsGeneratingReport(true);
-    addLog(`레포트 생성 중 (${reportStartDate} ~ ${reportEndDate}, 형식: ${reportFormat})...`);
+    addLog(`レポート生成中 (${reportStartDate} ~ ${reportEndDate}, 形式: ${reportFormat})...`);
 
     try {
       const response = await fetch('/api/report', {
@@ -104,14 +104,14 @@ export default function Home() {
       const data = await response.json();
 
       if (response.ok && data.status === 'success' && data.reportContent) {
-        addLog(data.message || '레포트 생성 완료.');
+        addLog(data.message || 'レポート生成完了。');
         // 클라이언트 측에서 Markdown 다운로드 처리
         downloadMarkdown(data.fileName, data.reportContent);
       } else {
-        addLog(`레포트 생성 실패: ${data.message || '내용 없음'}`);
+        addLog(`レポート生成失敗: ${data.message || '内容なし'}`);
       }
     } catch (error) {
-      addLog(`레포트 생성 API 호출 오류: ${(error as Error).message}`);
+      addLog(`レポート生成API呼び出しエラー: ${(error as Error).message}`);
     } finally {
       setIsGeneratingReport(false);
     }
@@ -127,9 +127,9 @@ export default function Home() {
     document.body.appendChild(element); // Required for this to work in FireFox
     element.click();
     document.body.removeChild(element);
-    addLog(`"${filename}" 파일 다운로드 시작됨.`);
+    addLog(`"${filename}" ファイルダウンロード開始。`);
   };
-  // --- useEffect: 설정 로드 (마운트 시 1회) ---
+  // --- useEffect: 設定ロード (マウント時1回) ---
   useEffect(() => {
     const loadSettings = async () => {
       if (window.electronAPI?.readSettings) {
@@ -140,7 +140,7 @@ export default function Home() {
           setDeleteAfterUpload(settings.deleteAfterUpload ?? false);
           addLog('ローカル設定を読み込みました。');
         } catch (error) {
-          addLog(`로컬 설정 로드 오류: ${(error as Error).message}`);
+          addLog(`ローカル設定ロードエラー: ${(error as Error).message}`);
         }
       }
       // 자동 요약 설정 로드 (로그인 후)
@@ -239,53 +239,53 @@ export default function Home() {
 
   // --- 핸들러 함수들 ---
   const handleStartCapture = async () => {
-    console.log('캡처 시작 버튼 클릭됨!');
+    console.log('キャプチャ開始ボタンがクリックされました！');
     if (!window.electronAPI) {
-      addLog('Electron API를 찾을 수 없습니다.');
+      addLog('Electron API が見つかりません。');
       return;
     }
-    addLog('캡처 시작 요청 중...');
+    addLog('キャプチャ開始をリクエストしています...');
     const settings = { interval: intervalSec, resolution: parseFloat(resolution) };
     try {
       const result = await window.electronAPI.startCapture(settings);
       if (result.success) {
         setIsRecording(true);
-        addLog('캡처 시작됨.');
+        addLog('キャプチャを開始しました。');
       } else {
-        addLog(`캡처 시작 실패: ${result.message}`);
+        addLog(`キャプチャ開始に失敗しました: ${result.message}`);
       }
     } catch (error) {
-       addLog(`[IPC 오류] 캡처 시작: ${(error as Error).message}`);
+       addLog(`[IPC エラー] キャプチャ開始: ${(error as Error).message}`);
        console.error('[IPC Error] Start Capture:', error);
     }
   };
 
   const handleStopCapture = async () => {
-    console.log('캡처 중지 버튼 클릭됨!');
+    console.log('キャプチャ停止ボタンがクリックされました！');
     if (!window.electronAPI) {
-        addLog('Electron API를 찾을 수 없습니다.');
+        addLog('Electron API が見つかりません。');
         return;
     };
-    addLog('캡처 중지 요청 중...');
+    addLog('キャプチャ停止をリクエストしています...');
      try {
         const result = await window.electronAPI.stopCapture();
         if (result.success) {
           setIsRecording(false);
-          addLog('캡처 중지됨.');
+          addLog('キャプチャを停止しました。');
         } else {
-          addLog(`캡처 중지 실패: ${result.message}`);
+          addLog(`キャプチャ停止に失敗しました: ${result.message}`);
         }
     } catch (error) {
-        addLog(`[IPC 오류] 캡처 중지: ${(error as Error).message}`);
+        addLog(`[IPC エラー] キャプチャ停止: ${(error as Error).message}`);
         console.error('[IPC Error] Stop Capture:', error);
     }
   };
 
   const handleGenerateSummary = async () => {
-    console.log('요약 생성 버튼 클릭됨!');
+    console.log('要約生成ボタンがクリックされました！');
     setIsLoadingSummary(true);
     setSummary('');
-    addLog('오늘 활동 요약을 생성 중입니다...');
+    addLog('本日の活動要約を生成しています...');
 
     try {
       const response = await fetch('/api/summary', {
@@ -295,13 +295,13 @@ export default function Home() {
 
       if (response.ok && data.status === 'success') {
         setSummary(data.summary);
-        // data.message가 있으면 로그에 추가 (예: 캐시된 요약 반환 메시지)
-        addLog(data.message || '요약 생성 완료.');
+  // data.messageがあればログに追加 (例: キャッシュされた要約の返却メッセージ)
+  addLog(data.message || '要約の生成が完了しました。');
       } else {
-        addLog(`요약 생성 실패: ${data.message}`);
+  addLog(`要約の生成に失敗しました: ${data.message}`);
       }
     } catch (error) {
-      addLog(`API 호출 오류: ${(error as Error).message}`);
+      addLog(`API 呼び出しエラー: ${(error as Error).message}`);
       console.error('[API Error] Summary:', error);
     }
     setIsLoadingSummary(false);
@@ -319,7 +319,7 @@ export default function Home() {
   // --- [추가] 자동 요약 토글 핸들러 ---
   const handleAutoSummaryToggle = async (isChecked: boolean) => {
     setAutoSummaryEnabled(isChecked);
-    addLog(`자동 요약 설정을 ${isChecked ? '활성화' : '비활성화'}하는 중...`);
+    addLog(`自動要約設定を${isChecked ? '活性化' : '非活性化'}する中···`);
     try {
       const response = await fetch('/api/user/settings', {
         method: 'PUT',
@@ -328,13 +328,13 @@ export default function Home() {
       });
       const data = await response.json();
       if (response.ok && data.status === 'success') {
-        addLog('자동 요약 설정이 저장되었습니다.');
+        addLog('自動要約設定が保存されました。');
       } else {
-        addLog(`자동 요약 설정 저장 실패: ${data.message}`);
+        addLog(`自動要約設定保存失敗: ${data.message}`);
         setAutoSummaryEnabled(!isChecked); // 실패 시 UI 원복
       }
     } catch (error) {
-      addLog(`자동 요약 설정 API 호출 오류: ${(error as Error).message}`);
+      addLog(`自動要約設定 API 呼び出しエラー: ${(error as Error).message}`);
       setAutoSummaryEnabled(!isChecked); // 실패 시 UI 원복
     }
   };
@@ -372,7 +372,7 @@ export default function Home() {
              <div className="header-left">
               <div className="header-title">
                 <h1>Screen Capture AI</h1>
-                <p>자동 스크린샷 & AI 분석</p>
+                <p>自動スクリーンショット&AI分析</p>
               </div>
             </div>
             <div className="header-right">

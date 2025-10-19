@@ -1,9 +1,9 @@
 // src/app/api/report/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getUserIdFromAuth } from '@/lib/auth'; // 4단계 인증 헬퍼
+import { getUserIdFromAuth } from '@/lib/auth'; // 4段階認証ヘルパー
 
-// 날짜 문자열을 UTC Date 객체로 변환하는 헬퍼 함수
+// 日付文字列を UTC Date オブジェクトに変換するヘルパー関数
 function parseUTCDate(dateString: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return null;
   const parts = dateString.split('-').map(Number);
@@ -17,22 +17,22 @@ export async function POST(request: NextRequest) {
     // 1. 인증
     const userId = await getUserIdFromAuth(request);
     if (!userId) {
-      return NextResponse.json({ status: 'error', message: '인증 실패' }, { status: 401 });
+      return NextResponse.json({ status: 'error', message: '認証に失敗しました' }, { status: 401 });
     }
 
     // 2. 요청 본문 파싱 (시작 날짜, 종료 날짜, 형식)
     const body = await request.json();
-    const { startDate: startDateStr, endDate: endDateStr, format = 'md' } = body; // 기본 형식은 md
+  const { startDate: startDateStr, endDate: endDateStr, format = 'md' } = body; // デフォルト形式は md
 
     if (!startDateStr || !endDateStr) {
-      return NextResponse.json({ status: 'error', message: '시작 날짜와 종료 날짜가 필요합니다.' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: '開始日と終了日が必要です。' }, { status: 400 });
     }
 
     const startDate = parseUTCDate(startDateStr);
     const endDate = parseUTCDate(endDateStr);
 
     if (!startDate || !endDate || startDate > endDate) {
-      return NextResponse.json({ status: 'error', message: '날짜 형식이 잘못되었거나 기간이 유효하지 않습니다.' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: '日付形式が正しくないか、期間が無効です。' }, { status: 400 });
     }
 
     // 3. DB에서 해당 기간의 요약 데이터(taskContent) 조회
@@ -57,16 +57,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (logs.length === 0) {
-      return NextResponse.json({ status: 'success', reportContent: null, message: '선택한 기간에 요약 데이터가 없습니다.' });
+      return NextResponse.json({ status: 'success', reportContent: null, message: '選択した期間に要約データがありません。' });
     }
 
     // 4. Markdown 레포트 내용 생성
-    let reportContent = `# 활동 레포트 (${startDateStr} ~ ${endDateStr})\n\n`;
-    logs.forEach(log => {
+  let reportContent = `# 活動レポート (${startDateStr} ~ ${endDateStr})\n\n`;
+    logs.forEach((log: any) => {
       // Date 객체를 YYYY-MM-DD 형식으로 변환 (ISOString 활용)
       const dateKey = log.taskDateId.toISOString().split('T')[0];
       reportContent += `## ${dateKey}\n\n`;
-      reportContent += `${log.taskContent || '요약 없음'}\n\n`; // 각 날짜의 Markdown 요약 추가
+      reportContent += `${log.taskContent || '要約なし'}\n\n`; // 各日の Markdown 要約を追加
       reportContent += '---\n\n'; // 날짜 구분선
     });
 
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       status: 'success',
       fileName: fileName,
       reportContent: reportContent,
-      message: `${logs.length}일 분량의 레포트 생성 완료.`
+      message: `${logs.length}日分のレポートを作成しました。`
     });
 
     // (향후 Word/PDF 구현 시)
@@ -85,6 +85,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('[API /api/report Error]', error);
-    return NextResponse.json({ status: 'error', message: '레포트 생성 중 오류 발생' }, { status: 500 });
+    return NextResponse.json({ status: 'error', message: 'レポート作成中にエラーが発生しました' }, { status: 500 });
   }
 }

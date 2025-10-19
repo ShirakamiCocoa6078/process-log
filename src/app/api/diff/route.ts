@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getUserIdFromAuth } from '@/lib/auth'; // 1번에서 만든 헬퍼
+import { getUserIdFromAuth } from '@/lib/auth'; // 1番で作成したヘルパー
 import fs from 'fs';
 import path from 'path';
 
@@ -26,8 +26,8 @@ let AI_PROMPT_TEMPLATE: string;
 try {
   // 서버가 시작될 때 파일을 동기적으로 읽어 변수에 저장
   AI_PROMPT_TEMPLATE = fs.readFileSync(promptFilePath, 'utf-8');
-} catch (error) {
-  console.error("developer-prompt.txt 파일을 읽는 데 실패했습니다.", error);
+  } catch (error) {
+  console.error("developer-prompt.txt を読み取れませんでした。", error);
   // 파일 로드 실패 시 사용할 기본 프롬프트 (오류 방지)
   AI_PROMPT_TEMPLATE = `2枚の画像を比較し、それぞれの観察内容・共通点・差分を詳細に説明し、最後に新しい画像（画像B）の重要度を示す指標（数値）を含むJSON形式で出力してください。
 
@@ -80,14 +80,14 @@ try {
 - 出力はJSONのみ。段落や見出し、Markdownは不要です。`;
 }
 
-// 스크린샷 페이로드 타입
+// スクリーンショットペイロード型
 interface ScreenshotPayload {
   filename: string;
   data: string; // Base64 data URI
 }
 
 /**
- * 두 개의 이미지를 OpenAI에 보내 비교 분석을 요청
+ * 2つの画像をOpenAIに送り、比較分析を依頼する
  */
 async function analyzeImages(imgA: ScreenshotPayload, imgB: ScreenshotPayload) {
     const openai = new OpenAI({
@@ -129,14 +129,15 @@ async function analyzeImages(imgA: ScreenshotPayload, imgB: ScreenshotPayload) {
 }
 
 /**
- * 스크린샷 파일명에서 타임스탬프 키 파싱
- * (예: "screenshot_2025-10-18_13-00-05.png" -> "13-00-05")
+ * スクリーンショットファイル名からタイムスタンプキーを解析
+ * (例: "screenshot_2025-10-18_13-00-05.png" -> "13-00-05")
  */
 function parseTimestampKey(filename: string): { date: Date, timeKey: string } {
   // 1. 날짜 및 시간 부분 추출 (예: "2025-10-18_13-00-05")
+  // 1. 日付と時刻部分を抽出 (例: "2025-10-18_13-00-05")
   const match = filename.match(/(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})/);
   if (!match) {
-    // 매치 실패 시 현재 시간 기준
+    // マッチしない場合は現在時刻を基準にする
     const now = new Date();
     return {
       date: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
@@ -147,7 +148,7 @@ function parseTimestampKey(filename: string): { date: Date, timeKey: string } {
   const dateStr = match[1]; // "2025-10-18"
   const timeStr = match[2]; // "13-00-05"
   
-  // UTC 자정 기준 날짜 객체 생성
+  // UTC の午前0時基準で日付オブジェクトを生成
   const dateParts = dateStr.split('-').map(Number);
   const taskDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
 
@@ -158,13 +159,13 @@ function parseTimestampKey(filename: string): { date: Date, timeKey: string } {
 }
 
 
-// --- POST 핸들러 ---
+// --- POST ハンドラ ---
 export async function POST(request: NextRequest) {
   try {
-    // 1. 인증: Bearer 토큰으로 userId 가져오기 (1번 파일)
+    // 1. 認証: Bearer トークンから userId を取得 (1番のファイル参照)
     const userId = await getUserIdFromAuth(request);
     if (!userId) {
-      return NextResponse.json({ status: 'error', message: '인증 실패' }, { status: 401 });
+      return NextResponse.json({ status: 'error', message: '認証に失敗しました' }, { status: 401 });
     }
 
     // 2. 요청 본문 파싱
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest) {
     const { screenshots } = body as { screenshots: ScreenshotPayload[] };
 
     if (!screenshots || screenshots.length !== 2) {
-      return NextResponse.json({ status: 'error', message: '스크린샷 2개가 필요합니다.' }, { status: 400 });
+      return NextResponse.json({ status: 'error', message: 'スクリーンショットが2枚必要です。' }, { status: 400 });
     }
 
     const [imgA, imgB] = screenshots;
@@ -184,8 +185,8 @@ export async function POST(request: NextRequest) {
     // (키는 첫 번째, 즉 더 빠른 스크린샷을 기준으로 함)
     const { date: taskDateId, timeKey } = parseTimestampKey(imgA.filename);
     
-    // 5. DB 저장 로직 (Upsert)
-    // 5-1. 오늘 날짜의 로그가 있는지 확인
+    // 5. DB 保存ロジック (Upsert)
+    // 5-1. 本日の日付のログがあるか確認
     const existingLog = await prisma.personalTaskLog.findUnique({
       where: {
         userId_taskDateId: { userId, taskDateId }
@@ -198,7 +199,7 @@ export async function POST(request: NextRequest) {
     newJsonData = existingLog.taskTempTxt as Record<string, any>;
     }
     
-    // 5-2. 새 분석 결과를 타임스탬프 키로 추가 (덮어쓰기/추가)
+    // 5-2. 新しい分析結果をタイムスタンプキーで追加 (上書き/追加)
     newJsonData[timeKey] = analysisResult;
 
     // 5-3. DB에 생성 또는 업데이트
@@ -218,7 +219,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       status: 'success',
-      message: '분석 완료 및 저장 성공',
+      message: '分析完了および保存に成功しました',
       timestampKey: timeKey,
     });
 
