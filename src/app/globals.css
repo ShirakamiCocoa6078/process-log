@@ -171,7 +171,9 @@ body {
 	.grid { grid-template-columns: 1fr; }
 }
 
-.col-left, .col-right { display:flex; flex-direction:column; gap:1.5rem }
+.col-left, .col-right {
+  display:flex; flex-direction:column; gap:1.5rem;
+}
 
 /* Card */
 .card {
@@ -317,6 +319,8 @@ body {
   line-height: 1.6;
   min-height: 100vh;
   transition: all 0.3s;
+  margin-left: auto
+;
 }
 
 /* Container */
@@ -404,10 +408,9 @@ main {
 /* 로그인 화면용 wrapper (헤더 높이 80px를 고려하여 중앙 정렬) */
 .login-outer {
   display: flex;
-  justify-content: center; /* 가로 가운데 */
-  align-items: center;     /* 세로 가운데 */
   min-height: calc(100vh - 80px); /* 헤더 높이(80px) 제외 */
-  padding-top: 80px; /* 헤더 공간 확보 */
+  padding-left:50rem;
+  padding-bottom: 21rem;
 }
 
 /* 로그인 이후의 앱 화면 전체를 중앙 정렬 (헤더 높이 고려) */
@@ -416,7 +419,8 @@ main {
   justify-content: center; /* 가로 가운데 정렬 */
   align-items: center;     /* 세로 가운데 정렬 */
   min-height: calc(100vh - 80px); /* 헤더 높이(80px) 제외 */
-  padding-top: 80px; /* 헤더 공간 확보 */
+  padding-top: 0; /* 헤더 공간 확보 */
+  padding-left: 230px;
 }
 
 /* 画面幅が1000px "以下" になった場合に1列にする */
