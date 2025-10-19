@@ -1,7 +1,6 @@
 // src/lib/auth.ts
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { cookies } from 'next/headers'
 
 /**
  * [업그레이드됨] Bearer 토큰(Python) 또는 세션 쿠키(브라우저)를 검증하고 
@@ -26,9 +25,9 @@ export async function getUserIdFromAuth(request: NextRequest): Promise<string | 
     const localCookieName = 'next-auth.session-token';
     
     // next/headers에서 쿠키 가져오기
-    const cookieStore = cookies();
-    const secureCookie = cookieStore.get(cookieName);
-    const localCookie = cookieStore.get(localCookieName);
+    const cookieStore = request.cookies; 
+  const secureCookie = cookieStore.get(cookieName);
+  const localCookie = cookieStore.get(localCookieName);
 
     if (secureCookie) {
       sessionToken = secureCookie.value;
